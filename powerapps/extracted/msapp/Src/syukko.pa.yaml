@@ -1,0 +1,2303 @@
+# ************************************************************************************************
+# Warning: YAML source code for Canvas Apps should only be used to review changes made within Power Apps Studio and for minor edits (Preview).
+# Use the maker portal to create and edit your Power Apps.
+# 
+# The schema file for Canvas Apps is available at https://go.microsoft.com/fwlink/?linkid=2304907
+# 
+# For more information, visit https://go.microsoft.com/fwlink/?linkid=2292623
+# ************************************************************************************************
+Screens:
+  syukko:
+    Properties:
+      Fill: =RGBA(255, 255, 255, 1)
+      LoadingSpinnerColor: =RGBA(0, 120, 212, 1)
+      OnVisible: |-
+        =UpdateContext({ItemNum:""});
+        NewForm(Form5_1);
+    Children:
+      - RectQuickActionBar1_1:
+          Control: Rectangle@2.3.0
+          Properties:
+            BorderColor: =RGBA(0, 0, 0, 0)
+            Fill: =RGBA(0, 120, 212, 1)
+            Height: =88
+            Width: =Parent.Width
+      - LblAppName2_1:
+          Control: Label@2.5.1
+          Properties:
+            Align: =Align.Center
+            BorderColor: =RGBA(0, 0, 0, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            DisabledColor: =RGBA(161, 159, 157, 1)
+            Font: =Font.'Segoe UI'
+            Height: =88
+            Size: =27
+            Text: ="出庫"
+            Width: =Parent.Width
+      - Container2_1:
+          Control: GroupContainer@1.4.0
+          Variant: AutoLayout
+          Properties:
+            DropShadow: =DropShadow.None
+            Height: =Parent.Height - RectQuickActionBar1_1.Height
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutGap: =10
+            PaddingTop: =10
+            Width: =Parent.Width
+            Y: =RectQuickActionBar1_1.Height
+          Children:
+            - BarcodeReader3_1:
+                Control: BarcodeReader@1.0.25
+                Properties:
+                  OnScan: |-
+                    =UpdateContext({ItemNum: First(Self.Barcodes).Value});
+                    UpdateContext(
+                        {
+                            CurrentNumOfItem_O: LookUp(
+                                pms_備品管理,
+                                部品品番 = ItemNum
+                            ).'部品数（事務所）',
+                            CurrentNumOfItem_C: LookUp(
+                                pms_備品管理,
+                                部品品番 = ItemNum
+                            ).'部品数（車載）'
+                        }
+                    )
+            - Form5_1:
+                Control: Form@2.4.4
+                Variant: Classic
+                Layout: Vertical
+                Properties:
+                  BorderColor: =RGBA(245, 245, 245, 1)
+                  DataSource: ='pms_出庫管理'
+                  DefaultMode: =FormMode.New
+                  OnFailure: =Notify("登録できませんでした。:" & Form5_1.Error,NotificationType.Error)
+                  OnSuccess: |-
+                    =Notify("登録しました",NotificationType.Success);
+                    UpdateContext({ItemNum: ""});
+                    NewForm(Form5_1);
+                Children:
+                  - title_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicTextualEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="Title"
+                        Default: =ThisItem.部品品番
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,部品品番)
+                        MaxLength: =DataSourceInfo([@pms_出庫管理], DataSourceInfo.MaxLength, 部品品番)
+                        Required: =false
+                        Update: =DataCardValue1.Text
+                        X: =0
+                        Y: =0
+                      Children:
+                        - DataCardKey1:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="部品品番"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - DataCardValue1:
+                            Control: Classic/TextInput@2.3.2
+                            MetadataKey: FieldValue
+                            Properties:
+                              BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                              Color: =RGBA(50, 49, 48, 1)
+                              Default: =ItemNum
+                              DelayOutput: =true
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              DisplayMode: =Parent.DisplayMode
+                              Font: =Font.'Segoe UI'
+                              HoverBorderColor: =RGBA(16, 110, 190, 1)
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(255, 255, 255, 1)
+                              MaxLength: =Parent.MaxLength
+                              OnChange: |-
+                                =With(
+                                    {ItemNum: Self.Text},
+                                    UpdateContext(
+                                        {
+                                            CurrentNumOfItem_O: LookUp(
+                                                pms_備品管理,
+                                                部品品番 = ItemNum
+                                            ).'部品数（事務所）',
+                                            CurrentNumOfItem_C: LookUp(
+                                                pms_備品管理,
+                                                部品品番 = ItemNum
+                                            ).'部品数（車載）'
+                                        }
+                                    )
+                                )
+                              PaddingLeft: =5
+                              PressedBorderColor: =RGBA(0, 120, 212, 1)
+                              PressedColor: =RGBA(50, 49, 48, 1)
+                              PressedFill: =RGBA(255, 255, 255, 1)
+                              RadiusBottomLeft: =0
+                              RadiusBottomRight: =0
+                              RadiusTopLeft: =0
+                              RadiusTopRight: =0
+                              Tooltip: =Parent.DisplayName
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey1.Y + DataCardKey1.Height + 5
+                        - ErrorMessage1:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardValue1.Y + DataCardValue1.Height
+                        - StarVisible1:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey1.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey1.Y
+                  - syukkobi_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicDateEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="field_1"
+                        Default: =ThisItem.出庫日
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,出庫日)
+                        Required: =false
+                        Update: =DataCardValue2.SelectedDate
+                        X: =0
+                        Y: =1
+                      Children:
+                        - DataCardKey2:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="出庫日"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - DataCardValue2:
+                            Control: Classic/DatePicker@2.6.0
+                            MetadataKey: FieldValue
+                            Properties:
+                              BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              DisplayMode: =Parent.DisplayMode
+                              EndYear: =Year(Today())+100
+                              Fill: =RGBA(245, 245, 245, 1)
+                              Font: =Font.'Segoe UI'
+                              IconBackground: =RGBA(0, 120, 212, 1)
+                              IconFill: =RGBA(255, 255, 255, 1)
+                              IsEditable: =true
+                              PaddingBottom: =0
+                              PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0)
+                              Size: =21
+                              StartYear: =1899
+                              Tooltip: =Parent.DisplayName
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey2.Y + DataCardKey2.Height + 5
+                        - ErrorMessage2:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardValue2.Y + DataCardValue2.Height
+                        - StarVisible2:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey2.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey2.Y
+                  - buhinmeisyo_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicTextualEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="field_2"
+                        Default: =ThisItem.部品名称
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,部品名称)
+                        MaxLength: =DataSourceInfo([@pms_出庫管理], DataSourceInfo.MaxLength, 部品名称)
+                        Required: =false
+                        Update: =DataCardValue3.Text
+                        X: =0
+                        Y: =2
+                      Children:
+                        - DataCardKey3:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="部品名称"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - DataCardValue3:
+                            Control: Classic/TextInput@2.3.2
+                            MetadataKey: FieldValue
+                            Properties:
+                              BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                              Color: =RGBA(50, 49, 48, 1)
+                              Default: =LookUp(pms_出庫管理,部品品番=DataCardValue1.Text).部品名称
+                              DelayOutput: =true
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              DisplayMode: =Parent.DisplayMode
+                              Font: =Font.'Segoe UI'
+                              HoverBorderColor: =RGBA(16, 110, 190, 1)
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(255, 255, 255, 1)
+                              MaxLength: =Parent.MaxLength
+                              PaddingLeft: =5
+                              PressedBorderColor: =RGBA(0, 120, 212, 1)
+                              PressedColor: =RGBA(50, 49, 48, 1)
+                              PressedFill: =RGBA(255, 255, 255, 1)
+                              RadiusBottomLeft: =0
+                              RadiusBottomRight: =0
+                              RadiusTopLeft: =0
+                              RadiusTopRight: =0
+                              Tooltip: =Parent.DisplayName
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey3.Y + DataCardKey3.Height + 5
+                        - ErrorMessage3:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardValue3.Y + DataCardValue3.Height
+                        - StarVisible3:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey3.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey3.Y
+                  - 部品代_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicNumberEdit
+                      IsLocked: true
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="buhindai"
+                        Default: =ThisItem.部品代
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,部品代)
+                        Required: =false
+                        Update: =Value(DataCardValue9.Text)
+                        X: =0
+                        Y: =3
+                      Children:
+                        - DataCardKey17:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: =Parent.DisplayName
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - DataCardValue9:
+                            Control: Classic/TextInput@2.3.2
+                            MetadataKey: FieldValue
+                            Properties:
+                              BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                              Color: =RGBA(50, 49, 48, 1)
+                              Default: =Parent.Default
+                              DelayOutput: =true
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              DisplayMode: =Parent.DisplayMode
+                              Font: =Font.'Segoe UI'
+                              Format: =TextFormat.Number
+                              HoverBorderColor: =RGBA(16, 110, 190, 1)
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(255, 255, 255, 1)
+                              PaddingLeft: =5
+                              PressedBorderColor: =RGBA(0, 120, 212, 1)
+                              PressedColor: =RGBA(50, 49, 48, 1)
+                              PressedFill: =RGBA(255, 255, 255, 1)
+                              RadiusBottomLeft: =0
+                              RadiusBottomRight: =0
+                              RadiusTopLeft: =0
+                              RadiusTopRight: =0
+                              Tooltip: =Parent.DisplayName
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey17.Y + DataCardKey17.Height + 5
+                        - ErrorMessage17:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardValue9.Y + DataCardValue9.Height
+                        - StarVisible17:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey17.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey17.Y
+                  - syukkosu_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicNumberEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="field_3"
+                        Default: =ThisItem.出庫数
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,出庫数)
+                        Required: =false
+                        Update: =Value(DataCardValue4.Text)
+                        X: =0
+                        Y: =4
+                      Children:
+                        - DataCardKey4:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="出庫数"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - DataCardValue4:
+                            Control: Classic/TextInput@2.3.2
+                            MetadataKey: FieldValue
+                            Properties:
+                              BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                              Color: =RGBA(50, 49, 48, 1)
+                              Default: =Parent.Default
+                              DelayOutput: =true
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              DisplayMode: =Parent.DisplayMode
+                              Font: =Font.'Segoe UI'
+                              Format: =TextFormat.Number
+                              HoverBorderColor: =RGBA(16, 110, 190, 1)
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(255, 255, 255, 1)
+                              PaddingLeft: =5
+                              PressedBorderColor: =RGBA(0, 120, 212, 1)
+                              PressedColor: =RGBA(50, 49, 48, 1)
+                              PressedFill: =RGBA(255, 255, 255, 1)
+                              RadiusBottomLeft: =0
+                              RadiusBottomRight: =0
+                              RadiusTopLeft: =0
+                              RadiusTopRight: =0
+                              Tooltip: =Parent.DisplayName
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey4.Y + DataCardKey4.Height + 5
+                        - ErrorMessage4:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardValue4.Y + DataCardValue4.Height
+                        - StarVisible4:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey4.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey4.Y
+                  - syukkotanntoysya_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicTextualEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="field_4"
+                        Default: =ThisItem.出庫担当者
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,出庫担当者)
+                        MaxLength: =DataSourceInfo([@pms_出庫管理], DataSourceInfo.MaxLength, 出庫担当者)
+                        Required: =false
+                        Update: =ComboBox3.Selected.担当者
+                        X: =0
+                        Y: =5
+                      Children:
+                        - DataCardKey9:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="出庫担当者"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - ErrorMessage9:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =ComboBox3.Y + ComboBox3.Height
+                        - StarVisible9:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey9.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey9.Y
+                        - ComboBox3:
+                            Control: Classic/ComboBox@2.4.0
+                            Properties:
+                              BorderColor: =RGBA(245, 245, 245, 1)
+                              ChevronBackground: =RGBA(245, 245, 245, 1)
+                              ChevronDisabledBackground: =RGBA(242, 242, 241, 0)
+                              ChevronDisabledFill: =RGBA(161, 159, 157, 1)
+                              ChevronFill: =RGBA(50, 49, 48, 1)
+                              ChevronHoverBackground: =RGBA(245, 245, 245, 1)
+                              ChevronHoverFill: =RGBA(50, 49, 48, 1)
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              DisplayFields: =["Title"]
+                              Fill: =RGBA(245, 245, 245, 1)
+                              Font: =Font.'Segoe UI'
+                              HoverBorderColor: =RGBA(16, 110, 190, 1)
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(245, 245, 245, 1)
+                              Items: =Filter(pms_担当者,担当.Value="出庫")
+                              PressedBorderColor: =RGBA(16, 110, 190, 1)
+                              PressedColor: =RGBA(255, 255, 255, 1)
+                              PressedFill: =RGBA(0, 120, 212, 1)
+                              SearchFields: =["Title"]
+                              SelectMultiple: =false
+                              SelectionColor: =RGBA(255, 255, 255, 1)
+                              SelectionFill: =RGBA(0, 120, 212, 1)
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey9.Y + DataCardKey9.Height + 5
+                  - hokanbasyo_sagyoumae_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicComboBoxEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="hokanbasyo_sagyoumae"
+                        Default: =ThisItem.作業前保管場所
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,作業前保管場所)
+                        Required: =false
+                        Update: =Radio4.Selected
+                        X: =0
+                        Y: =6
+                      Children:
+                        - DataCardKey20:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="元々の保管場所は？"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - ErrorMessage20:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =Radio4.Y + Radio4.Height
+                        - StarVisible20:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey20.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey20.Y
+                        - Radio4:
+                            Control: Classic/Radio@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(50, 49, 48, 1)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              Height: =70
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(0, 0, 0, 0)
+                              Items: =Choices([@pms_出庫管理].作業前保管場所)
+                              Items.Value: =Value
+                              Layout: =Layout.Horizontal
+                              PaddingBottom: =5
+                              PaddingTop: =5
+                              PressedColor: =RGBA(50, 49, 48, 1)
+                              PressedFill: =RGBA(0, 0, 0, 0)
+                              RadioBorderColor: =RGBA(50, 49, 48, 1)
+                              RadioSelectionFill: =RGBA(0, 120, 212, 1)
+                              RadioSize: =60
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey20.Y + DataCardKey20.Height + 5
+                  - hokanbasyo_syasai_sagyoumae_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicTextualEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="hokanbasyo_syasai_sagyoumae"
+                        Default: =ThisItem.'作業前保管場所（車載）'
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,'作業前保管場所（車載）')
+                        MaxLength: =DataSourceInfo([@pms_出庫管理], DataSourceInfo.MaxLength, '作業前保管場所（車載）')
+                        Required: =Self.Visible
+                        Update: =ComboBox4.Selected.Value
+                        Visible: =Switch(Radio4.Selected.Value, "事務所", false, "車載", true)
+                        X: =0
+                        Y: =7
+                      Children:
+                        - DataCardKey19:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="保管場所（車載）（作業前）"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - ErrorMessage19:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =ComboBox4.Y + ComboBox4.Height
+                        - StarVisible19:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey19.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey19.Y
+                        - ComboBox4:
+                            Control: Classic/ComboBox@2.4.0
+                            Properties:
+                              BorderColor: =RGBA(245, 245, 245, 1)
+                              ChevronBackground: =RGBA(245, 245, 245, 1)
+                              ChevronDisabledBackground: =RGBA(242, 242, 241, 0)
+                              ChevronDisabledFill: =RGBA(161, 159, 157, 1)
+                              ChevronFill: =RGBA(50, 49, 48, 1)
+                              ChevronHoverBackground: =RGBA(245, 245, 245, 1)
+                              ChevronHoverFill: =RGBA(50, 49, 48, 1)
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              DisplayFields: =[""]
+                              Fill: =RGBA(245, 245, 245, 1)
+                              Font: =Font.'Segoe UI'
+                              HoverBorderColor: =RGBA(16, 110, 190, 1)
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(245, 245, 245, 1)
+                              IsSearchable: =false
+                              Items: =Distinct(Filter(pms_車載部品, 部品品番 = DataCardValue1.Text),'保管場所（車載）')
+                              PressedBorderColor: =RGBA(16, 110, 190, 1)
+                              PressedColor: =RGBA(255, 255, 255, 1)
+                              PressedFill: =RGBA(0, 120, 212, 1)
+                              SearchFields: =[""]
+                              SelectMultiple: =false
+                              SelectionColor: =RGBA(255, 255, 255, 1)
+                              SelectionFill: =RGBA(0, 120, 212, 1)
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey19.Y + DataCardKey19.Height + 5
+                  - shiyoucheck_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicComboBoxEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="field_5"
+                        Default: =ThisItem.使用チェック
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,使用チェック)
+                        Required: =false
+                        Update: =Radio1.Selected
+                        X: =0
+                        Y: =8
+                      Children:
+                        - DataCardKey10:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="使用しましたか？"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - ErrorMessage10:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =Radio1.Y + Radio1.Height
+                        - StarVisible10:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey10.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey10.Y
+                        - Radio1:
+                            Control: Classic/Radio@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(50, 49, 48, 1)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              Height: =70
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(0, 0, 0, 0)
+                              Items: =Choices([@pms_出庫管理].使用チェック)
+                              Items.Value: =Value
+                              Layout: =Layout.Horizontal
+                              PaddingBottom: =5
+                              PaddingTop: =5
+                              PressedColor: =RGBA(50, 49, 48, 1)
+                              PressedFill: =RGBA(0, 0, 0, 0)
+                              RadioBorderColor: =RGBA(50, 49, 48, 1)
+                              RadioSelectionFill: =RGBA(0, 120, 212, 1)
+                              RadioSize: =60
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey10.Y + DataCardKey10.Height + 5
+                  - 使用済_uketukebanngou_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicTextualEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="field_6"
+                        Default: =ThisItem.受付番号
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,受付番号)
+                        MaxLength: =DataSourceInfo([@pms_出庫管理], DataSourceInfo.MaxLength, 受付番号)
+                        Required: =false
+                        Update: =DataCardValue5.Text
+                        Visible: =Switch(Radio1.Selected.Value, "使用済", true, "未使用", false)
+                        X: =0
+                        Y: =9
+                      Children:
+                        - DataCardKey5:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="受付番号"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - DataCardValue5:
+                            Control: Classic/TextInput@2.3.2
+                            MetadataKey: FieldValue
+                            Properties:
+                              BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                              Color: =RGBA(50, 49, 48, 1)
+                              Default: =Parent.Default
+                              DelayOutput: =true
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              DisplayMode: =Parent.DisplayMode
+                              Font: =Font.'Segoe UI'
+                              HoverBorderColor: =RGBA(16, 110, 190, 1)
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(255, 255, 255, 1)
+                              MaxLength: =Parent.MaxLength
+                              PaddingLeft: =5
+                              PressedBorderColor: =RGBA(0, 120, 212, 1)
+                              PressedColor: =RGBA(50, 49, 48, 1)
+                              PressedFill: =RGBA(255, 255, 255, 1)
+                              RadiusBottomLeft: =0
+                              RadiusBottomRight: =0
+                              RadiusTopLeft: =0
+                              RadiusTopRight: =0
+                              Tooltip: =Parent.DisplayName
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey5.Y + DataCardKey5.Height + 5
+                        - ErrorMessage5:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardValue5.Y + DataCardValue5.Height
+                        - StarVisible5:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey5.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey5.Y
+                  - 使用済_parkimage_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicLargePicture
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="parkimage"
+                        Default: =ThisItem.パーキング領収書画像
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,パーキング領収書画像)
+                        Required: =false
+                        Update: =Image1.Image
+                        Visible: =Switch(Radio1.Selected.Value, "使用済", true, "未使用", false)
+                        X: =0
+                        Y: =10
+                      Children:
+                        - DataCardKey11:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="パーキング領収書画像"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - Image1:
+                            Control: Image@2.2.3
+                            MetadataKey: FieldValue
+                            Properties:
+                              BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledFill: =RGBA(0, 0, 0, 0)
+                              DisplayMode: =Parent.DisplayMode
+                              FocusedBorderThickness: =4
+                              Height: =AddPicture1.Height
+                              HoverBorderColor: =RGBA(0, 0, 0, 0)
+                              HoverFill: =RGBA(0, 0, 0, 0)
+                              Image: =If(IsBlank(AddPicture1.Media), Parent.Default, AddPicture1.Media)
+                              PressedBorderColor: =RGBA(0, 0, 0, 0)
+                              PressedFill: =RGBA(0, 0, 0, 0)
+                              Tooltip: =Parent.DisplayName
+                              Width: =AddPicture1.Width
+                              X: =AddPicture1.X
+                              Y: =AddPicture1.Y
+                        - AddPicture1:
+                            Control: AddMedia@2.2.1
+                            MetadataKey: AddPicture
+                            Properties:
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(255, 255, 255, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              Fill: =RGBA(0, 120, 212, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              Height: =320
+                              HoverBorderColor: =RGBA(0, 0, 0, 0)
+                              HoverColor: =RGBA(255, 255, 255, 1)
+                              HoverFill: =RGBA(16, 110, 190, 1)
+                              PressedBorderColor: =RGBA(0, 69, 120, 1)
+                              PressedColor: =RGBA(255, 255, 255, 1)
+                              PressedFill: =RGBA(16, 110, 190, 1)
+                              Size: =24
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey11.Y + DataCardKey11.Height + 5
+                        - ErrorMessage11:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =Image1.Y + Image1.Height
+                        - StarVisible11:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey11.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey11.Y
+                  - 使用済_ryoukin_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicNumberEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="field_8"
+                        Default: =ThisItem.パーキング料金
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,パーキング料金)
+                        Required: =false
+                        Update: =Value(DataCardValue6.Text)
+                        Visible: =Switch(Radio1.Selected.Value, "使用済", true, "未使用", false)
+                        X: =0
+                        Y: =11
+                      Children:
+                        - DataCardKey6:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="パーキング料金"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - DataCardValue6:
+                            Control: Classic/TextInput@2.3.2
+                            MetadataKey: FieldValue
+                            Properties:
+                              BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                              Color: =RGBA(50, 49, 48, 1)
+                              Default: =Parent.Default
+                              DelayOutput: =true
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              DisplayMode: =Parent.DisplayMode
+                              Font: =Font.'Segoe UI'
+                              Format: =TextFormat.Number
+                              HoverBorderColor: =RGBA(16, 110, 190, 1)
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(255, 255, 255, 1)
+                              PaddingLeft: =5
+                              PressedBorderColor: =RGBA(0, 120, 212, 1)
+                              PressedColor: =RGBA(50, 49, 48, 1)
+                              PressedFill: =RGBA(255, 255, 255, 1)
+                              RadiusBottomLeft: =0
+                              RadiusBottomRight: =0
+                              RadiusTopLeft: =0
+                              RadiusTopRight: =0
+                              Tooltip: =Parent.DisplayName
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey6.Y + DataCardKey6.Height + 5
+                        - ErrorMessage6:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardValue6.Y + DataCardValue6.Height
+                        - StarVisible6:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey6.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey6.Y
+                  - 使用済_gasimage_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicLargePicture
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="gasimage"
+                        Default: =ThisItem.ガス漏れチェック画像
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,ガス漏れチェック画像)
+                        Required: =false
+                        Update: =Image2.Image
+                        Visible: =Switch(Radio1.Selected.Value, "使用済", true, "未使用", false)
+                        X: =0
+                        Y: =12
+                      Children:
+                        - DataCardKey12:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="ガス漏れチェック画像"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - Image2:
+                            Control: Image@2.2.3
+                            MetadataKey: FieldValue
+                            Properties:
+                              BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledFill: =RGBA(0, 0, 0, 0)
+                              DisplayMode: =Parent.DisplayMode
+                              FocusedBorderThickness: =4
+                              Height: =AddPicture2.Height
+                              HoverBorderColor: =RGBA(0, 0, 0, 0)
+                              HoverFill: =RGBA(0, 0, 0, 0)
+                              Image: =If(IsBlank(AddPicture2.Media), Parent.Default, AddPicture2.Media)
+                              PressedBorderColor: =RGBA(0, 0, 0, 0)
+                              PressedFill: =RGBA(0, 0, 0, 0)
+                              Tooltip: =Parent.DisplayName
+                              Width: =AddPicture2.Width
+                              X: =AddPicture2.X
+                              Y: =AddPicture2.Y
+                        - AddPicture2:
+                            Control: AddMedia@2.2.1
+                            MetadataKey: AddPicture
+                            Properties:
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(255, 255, 255, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              Fill: =RGBA(0, 120, 212, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              Height: =320
+                              HoverBorderColor: =RGBA(0, 0, 0, 0)
+                              HoverColor: =RGBA(255, 255, 255, 1)
+                              HoverFill: =RGBA(16, 110, 190, 1)
+                              PressedBorderColor: =RGBA(0, 69, 120, 1)
+                              PressedColor: =RGBA(255, 255, 255, 1)
+                              PressedFill: =RGBA(16, 110, 190, 1)
+                              Size: =24
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey12.Y + DataCardKey12.Height + 5
+                        - ErrorMessage12:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =Image2.Y + Image2.Height
+                        - StarVisible12:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey12.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey12.Y
+                  - 使用済_odabanngou_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicTextualEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="field_10"
+                        Default: =ThisItem.オーダー番号
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,オーダー番号)
+                        MaxLength: =DataSourceInfo([@pms_出庫管理], DataSourceInfo.MaxLength, オーダー番号)
+                        Required: =false
+                        Update: =DataCardValue7.Text
+                        Visible: =Switch(Radio1.Selected.Value, "使用済", true, "未使用", false)
+                        X: =0
+                        Y: =13
+                      Children:
+                        - DataCardKey7:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="オーダ番号"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - DataCardValue7:
+                            Control: Classic/TextInput@2.3.2
+                            MetadataKey: FieldValue
+                            Properties:
+                              BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                              Color: =RGBA(50, 49, 48, 1)
+                              Default: =Parent.Default
+                              DelayOutput: =true
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              DisplayMode: =Parent.DisplayMode
+                              Font: =Font.'Segoe UI'
+                              HoverBorderColor: =RGBA(16, 110, 190, 1)
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(255, 255, 255, 1)
+                              MaxLength: =Parent.MaxLength
+                              PaddingLeft: =5
+                              PressedBorderColor: =RGBA(0, 120, 212, 1)
+                              PressedColor: =RGBA(50, 49, 48, 1)
+                              PressedFill: =RGBA(255, 255, 255, 1)
+                              RadiusBottomLeft: =0
+                              RadiusBottomRight: =0
+                              RadiusTopLeft: =0
+                              RadiusTopRight: =0
+                              Tooltip: =Parent.DisplayName
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey7.Y + DataCardKey7.Height + 5
+                        - ErrorMessage7:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardValue7.Y + DataCardValue7.Height
+                        - StarVisible7:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey7.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey7.Y
+                  - 使用済_seikyukubun_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicComboBoxEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="field_11"
+                        Default: =ThisItem.請求区分
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,請求区分)
+                        Required: =false
+                        Update: =Radio2.Selected
+                        Visible: =Switch(Radio1.Selected.Value, "使用済", true, "未使用", false)
+                        X: =0
+                        Y: =14
+                      Children:
+                        - DataCardKey13:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="請求区分"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - ErrorMessage13:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =Radio2.Y + Radio2.Height
+                        - StarVisible13:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey13.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey13.Y
+                        - Radio2:
+                            Control: Classic/Radio@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(50, 49, 48, 1)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              Height: =70
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(0, 0, 0, 0)
+                              Items: =Choices([@pms_出庫管理].請求区分)
+                              Items.Value: =Value
+                              Layout: =Layout.Horizontal
+                              PaddingBottom: =5
+                              PaddingTop: =5
+                              PressedColor: =RGBA(50, 49, 48, 1)
+                              PressedFill: =RGBA(0, 0, 0, 0)
+                              RadioBorderColor: =RGBA(50, 49, 48, 1)
+                              RadioSelectionFill: =RGBA(0, 120, 212, 1)
+                              RadioSize: =60
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey13.Y + DataCardKey13.Height + 5
+                  - 使用済_dennpyoubanngou_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicTextualEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="field_14"
+                        Default: =ThisItem.修理伝票番号
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,修理伝票番号)
+                        MaxLength: =DataSourceInfo([@pms_出庫管理], DataSourceInfo.MaxLength, 修理伝票番号)
+                        Required: =false
+                        Update: =DataCardValue15.Text
+                        Visible: =If(使用済_seikyukubun_DataCard1.Visible,Switch(Radio2.Selected.Value, "有料", false, "無料", true),false)
+                        X: =0
+                        Y: =15
+                      Children:
+                        - DataCardKey16:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="手書修理伝票番号"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - DataCardValue15:
+                            Control: Classic/TextInput@2.3.2
+                            MetadataKey: FieldValue
+                            Properties:
+                              BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                              Color: =RGBA(50, 49, 48, 1)
+                              Default: =Parent.Default
+                              DelayOutput: =true
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              DisplayMode: =Parent.DisplayMode
+                              Font: =Font.'Segoe UI'
+                              HoverBorderColor: =RGBA(16, 110, 190, 1)
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(255, 255, 255, 1)
+                              MaxLength: =Parent.MaxLength
+                              PaddingLeft: =5
+                              PressedBorderColor: =RGBA(0, 120, 212, 1)
+                              PressedColor: =RGBA(50, 49, 48, 1)
+                              PressedFill: =RGBA(255, 255, 255, 1)
+                              RadiusBottomLeft: =0
+                              RadiusBottomRight: =0
+                              RadiusTopLeft: =0
+                              RadiusTopRight: =0
+                              Tooltip: =Parent.DisplayName
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey16.Y + DataCardKey16.Height + 5
+                        - ErrorMessage16:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardValue15.Y + DataCardValue15.Height
+                        - StarVisible16:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey16.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey16.Y
+                  - 未使用_hokanbasyo_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicComboBoxEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="field_12"
+                        Default: =ThisItem.保管場所
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,保管場所)
+                        Required: =Self.Visible
+                        Update: =Radio3.Selected
+                        Visible: =Switch(Radio1.Selected.Value, "使用済", false, "未使用", true)
+                        X: =0
+                        Y: =16
+                      Children:
+                        - DataCardKey15:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Text: ="保管場所は？"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - ErrorMessage15:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =Radio3.Y + Radio3.Height
+                        - StarVisible15:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey15.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey15.Y
+                        - Radio3:
+                            Control: Classic/Radio@2.3.0
+                            Properties:
+                              BorderColor: =RGBA(50, 49, 48, 1)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              Height: =70
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(0, 0, 0, 0)
+                              Items: =Choices([@pms_出庫管理].保管場所)
+                              Items.Value: =Value
+                              Layout: =Layout.Horizontal
+                              PaddingBottom: =5
+                              PaddingTop: =5
+                              PressedColor: =RGBA(50, 49, 48, 1)
+                              PressedFill: =RGBA(0, 0, 0, 0)
+                              RadioBorderColor: =RGBA(50, 49, 48, 1)
+                              RadioSelectionFill: =RGBA(0, 120, 212, 1)
+                              RadioSize: =60
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey15.Y + DataCardKey15.Height + 5
+                  - 未使用_hokanbasyo_syasai_DataCard1:
+                      Control: TypedDataCard@1.0.7
+                      Variant: ClassicTextualEdit
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        DataField: ="field_13"
+                        Default: =ThisItem.'保管場所（車載）'.Value
+                        DisplayName: =DataSourceInfo([@pms_出庫管理],DataSourceInfo.DisplayName,'保管場所（車載）')
+                        Required: =Self.Visible
+                        Update: =ComboBox5.Selected.Value
+                        Visible: =Switch(Radio1.Selected.Value, "使用済み", false, "未使用", Switch(Radio3.Selected.Value, "事務所", false, "車載", true))
+                        X: =0
+                        Y: =17
+                      Children:
+                        - DataCardKey8:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldName
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =48
+                              PaddingLeft: =0
+                              Size: =15
+                              Text: ="誰の車に保管もしくは研修センターかを選択してください"
+                              Width: =Parent.Width - 60
+                              Wrap: =false
+                              X: =30
+                              Y: =10
+                        - ErrorMessage8:
+                            Control: Label@2.5.1
+                            MetadataKey: ErrorMessage
+                            Properties:
+                              AutoHeight: =true
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(168, 0, 0, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(168, 0, 0, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =10
+                              Live: =Live.Assertive
+                              PaddingBottom: =0
+                              PaddingLeft: =0
+                              PaddingRight: =0
+                              PaddingTop: =0
+                              Text: =Parent.Error
+                              Visible: =Parent.DisplayMode=DisplayMode.Edit
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =ComboBox5.Y + ComboBox5.Height
+                        - StarVisible8:
+                            Control: Label@2.5.1
+                            MetadataKey: FieldRequired
+                            Properties:
+                              Align: =Align.Center
+                              BorderColor: =RGBA(0, 0, 0, 0)
+                              BorderStyle: =BorderStyle.None
+                              BorderThickness: =2
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              FocusedBorderThickness: =4
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Semibold
+                              Height: =DataCardKey8.Height
+                              PaddingLeft: =0
+                              Text: ="*"
+                              Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                              Width: =30
+                              Wrap: =false
+                              Y: =DataCardKey8.Y
+                        - ComboBox5:
+                            Control: Classic/ComboBox@2.4.0
+                            Properties:
+                              BorderColor: =RGBA(245, 245, 245, 1)
+                              ChevronBackground: =RGBA(245, 245, 245, 1)
+                              ChevronDisabledBackground: =RGBA(242, 242, 241, 0)
+                              ChevronDisabledFill: =RGBA(161, 159, 157, 1)
+                              ChevronFill: =RGBA(50, 49, 48, 1)
+                              ChevronHoverBackground: =RGBA(245, 245, 245, 1)
+                              ChevronHoverFill: =RGBA(50, 49, 48, 1)
+                              Color: =RGBA(50, 49, 48, 1)
+                              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                              DisabledColor: =RGBA(161, 159, 157, 1)
+                              DisabledFill: =RGBA(242, 242, 241, 0)
+                              DisplayFields: =["Value"]
+                              Fill: =RGBA(245, 245, 245, 1)
+                              Font: =Font.'Segoe UI'
+                              HoverBorderColor: =RGBA(16, 110, 190, 1)
+                              HoverColor: =RGBA(50, 49, 48, 1)
+                              HoverFill: =RGBA(245, 245, 245, 1)
+                              Items: =Choices([@pms_出庫管理].'保管場所（車載）')
+                              PressedBorderColor: =RGBA(16, 110, 190, 1)
+                              PressedColor: =RGBA(255, 255, 255, 1)
+                              PressedFill: =RGBA(0, 120, 212, 1)
+                              SearchFields: =["Value"]
+                              SelectMultiple: =false
+                              SelectionColor: =RGBA(255, 255, 255, 1)
+                              SelectionFill: =RGBA(0, 120, 212, 1)
+                              Width: =Parent.Width - 60
+                              X: =30
+                              Y: =DataCardKey8.Y + DataCardKey8.Height + 5
+            - Container3_1:
+                Control: GroupContainer@1.4.0
+                Variant: AutoLayout
+                Properties:
+                  DropShadow: =DropShadow.None
+                  FillPortions: =0
+                  Height: =80
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutJustifyContent: =LayoutJustifyContent.SpaceBetween
+                  PaddingLeft: =10
+                  PaddingRight: =10
+                Children:
+                  - Button10_1:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        Fill: =RGBA(0, 120, 212, 1)
+                        Font: =Font.'Segoe UI'
+                        HoverBorderColor: =RGBA(0, 0, 0, 0)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =RGBA(16, 110, 190, 1)
+                        OnSelect: =Navigate(TOP)
+                        PressedBorderColor: =RGBA(0, 69, 120, 1)
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(16, 110, 190, 1)
+                        RadiusBottomLeft: =0
+                        RadiusBottomRight: =0
+                        RadiusTopLeft: =0
+                        RadiusTopRight: =0
+                        Text: ="ＴＯＰ"
+                        Width: =250
+                  - Button11_1:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        Fill: =RGBA(0, 120, 212, 1)
+                        Font: =Font.'Segoe UI'
+                        HoverBorderColor: =RGBA(0, 0, 0, 0)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =RGBA(16, 110, 190, 1)
+                        OnSelect: |-
+                          =UpdateContext(
+                              {
+                                  ItemNum: DataCardValue1.Text,
+                                  ItemName: DataCardValue3.Text,
+                                  CurrentStrgLocation: Radio4.Selected.Value,
+                                  CurrentStrgLocationDetail: ComboBox4.Selected.Value,
+                                  UseCheck: Radio1.Selected.Value,
+                                  BillCategory: Radio2.Selected.Value,
+                                  NextStrgLocation: Radio3.Selected.Value,
+                                  NumOfSyukkoItem: Value(DataCardValue4.Text),
+                                  NextNumOfItem_O: 0,
+                                  NextNumOfItem_C: 0
+                              }
+                          );
+                          With(
+                              {FlagComb5: ComboBox5.Selected},
+                              If(
+                                  IsBlank(FlagComb5),
+                                  UpdateContext({NextStrgLocationDetail: ComboBox5.SearchText}),
+                                  UpdateContext({NextStrgLocationDetail: FlagComb5.Value})
+                              )
+                          );
+                          If(
+                              UseCheck = "未使用" && CurrentStrgLocation = "事務所" && NextStrgLocation = "事務所",
+                              UpdateContext(
+                                  {
+                                      NextNumOfItem_O: CurrentNumOfItem_O,
+                                      NextNumOfItem_C: CurrentNumOfItem_C
+                                  }
+                              )
+                          );
+                          If(
+                              UseCheck = "未使用" && CurrentStrgLocation = "事務所" && NextStrgLocation = "車載",
+                              UpdateContext(
+                                  {
+                                      NextNumOfItem_O: CurrentNumOfItem_O - NumOfSyukkoItem,
+                                      NextNumOfItem_C: CurrentNumOfItem_C + NumOfSyukkoItem
+                                  }
+                              )
+                          );
+                          If(
+                              UseCheck = "未使用" && CurrentStrgLocation = "車載" && NextStrgLocation = "事務所",
+                              UpdateContext(
+                                  {
+                                      NextNumOfItem_O: CurrentNumOfItem_O + NumOfSyukkoItem,
+                                      NextNumOfItem_C: CurrentNumOfItem_C - NumOfSyukkoItem
+                                  }
+                              )
+                          );
+                          If(
+                              UseCheck = "未使用" && CurrentStrgLocation = "車載" && NextStrgLocation = "車載",
+                              UpdateContext(
+                                  {
+                                      NextNumOfItem_O: CurrentNumOfItem_O,
+                                      NextNumOfItem_C: CurrentNumOfItem_C
+                                  }
+                              )
+                          );
+                          If(
+                              UseCheck = "使用済" && CurrentStrgLocation = "事務所",
+                              UpdateContext(
+                                  {
+                                      NextNumOfItem_O: CurrentNumOfItem_O - NumOfSyukkoItem,
+                                      NextNumOfItem_C: CurrentNumOfItem_C
+                                  }
+                              )
+                          );
+                          If(
+                              UseCheck = "使用済" && CurrentStrgLocation = "車載",
+                              UpdateContext(
+                                  {
+                                      NextNumOfItem_O: CurrentNumOfItem_O,
+                                      NextNumOfItem_C: CurrentNumOfItem_C - NumOfSyukkoItem
+                                  }
+                              )
+                          );
+                          //備品リストの更新
+                          Patch(
+                              pms_備品管理,
+                              LookUp(
+                                  pms_備品管理,
+                                  部品品番 = ItemNum
+                              ),
+                              {
+                                  '部品数（事務所）': NextNumOfItem_O,
+                                  '部品数（車載）': NextNumOfItem_C
+                              }
+                          );
+                          //車載リストの更新
+                          UpdateContext(
+                              {
+                                  CurrentCarRec: LookUp(
+                                      pms_車載部品,
+                                      部品品番 = ItemNum && '保管場所（車載）' = CurrentStrgLocationDetail
+                                  ),
+                                  NewCarRec: LookUp(
+                                      pms_車載部品,
+                                      部品品番 = ItemNum && '保管場所（車載）' = NextStrgLocationDetail
+                                  )
+                              }
+                          );
+                          If(
+                              CurrentStrgLocation = "車載",
+                              If(
+                                  CurrentStrgLocationDetail <> NextStrgLocationDetail,
+                                  Patch(
+                                      pms_車載部品,
+                                      CurrentCarRec,
+                                      {部品数: CurrentCarRec.部品数 - NumOfSyukkoItem}
+                                  )
+                              )
+                          );
+                          If(
+                              NextStrgLocation = "車載",
+                              If(
+                                  IsBlank(NewCarRec),
+                                  Patch(
+                                      pms_車載部品,
+                                      Defaults(pms_車載部品),
+                                      {
+                                          部品品番: ItemNum,
+                                          '保管場所（車載）': NextStrgLocationDetail,
+                                          部品名称: ItemName,
+                                          部品数: NumOfSyukkoItem
+                                      }
+                                  ),
+                                  If(
+                                      CurrentStrgLocationDetail <> NextStrgLocationDetail,
+                                      Patch(
+                                          pms_車載部品,
+                                          NewCarRec,
+                                          {部品数: NewCarRec.部品数 + NumOfSyukkoItem}
+                                      )
+                                  )
+                              )
+                          );
+                          SubmitForm(Form5_1)
+                        PressedBorderColor: =RGBA(0, 69, 120, 1)
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(16, 110, 190, 1)
+                        RadiusBottomLeft: =0
+                        RadiusBottomRight: =0
+                        RadiusTopLeft: =0
+                        RadiusTopRight: =0
+                        Text: ="登録"
+                        Width: =250

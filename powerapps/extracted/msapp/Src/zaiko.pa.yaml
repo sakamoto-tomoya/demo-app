@@ -1,0 +1,352 @@
+# ************************************************************************************************
+# Warning: YAML source code for Canvas Apps should only be used to review changes made within Power Apps Studio and for minor edits (Preview).
+# Use the maker portal to create and edit your Power Apps.
+# 
+# The schema file for Canvas Apps is available at https://go.microsoft.com/fwlink/?linkid=2304907
+# 
+# For more information, visit https://go.microsoft.com/fwlink/?linkid=2292623
+# ************************************************************************************************
+Screens:
+  zaiko:
+    Properties:
+      Fill: =RGBA(255, 255, 255, 1)
+      LoadingSpinnerColor: =RGBA(0, 120, 212, 1)
+      OnVisible: |-
+        =Reset(TextInput1);
+        Clear(ItemList);
+        UpdateContext({ItemNum: ""})
+    Children:
+      - RectQuickActionBar1_3:
+          Control: Rectangle@2.3.0
+          Properties:
+            BorderColor: =RGBA(0, 0, 0, 0)
+            Fill: =RGBA(0, 120, 212, 1)
+            Height: =88
+            Width: =Parent.Width
+      - LblAppName2_3:
+          Control: Label@2.5.1
+          Properties:
+            Align: =Align.Center
+            BorderColor: =RGBA(0, 0, 0, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            DisabledColor: =RGBA(161, 159, 157, 1)
+            Font: =Font.'Segoe UI'
+            Height: =88
+            Size: =27
+            Text: ="在庫検索"
+            Width: =Parent.Width
+      - Container2_3:
+          Control: GroupContainer@1.4.0
+          Variant: AutoLayout
+          Properties:
+            DropShadow: =DropShadow.None
+            Height: =Parent.Height - RectQuickActionBar1_3.Height
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutGap: =20
+            PaddingBottom: =10
+            PaddingLeft: =10
+            PaddingRight: =10
+            PaddingTop: =10
+            Width: =Parent.Width
+            Y: =RectQuickActionBar1_3.Height
+          Children:
+            - BarcodeReader3_2:
+                Control: BarcodeReader@1.0.25
+                Properties:
+                  OnScan: |-
+                    =UpdateContext({ItemNum: First(Self.Barcodes).Value})
+            - Container4:
+                Control: GroupContainer@1.4.0
+                Variant: AutoLayout
+                Properties:
+                  DropShadow: =DropShadow.None
+                  FillPortions: =0
+                  Height: =75
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutJustifyContent: =LayoutJustifyContent.Center
+                Children:
+                  - Label2:
+                      Control: Label@2.5.1
+                      Properties:
+                        Align: =Align.Right
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        Text: ="部品品番："
+                        Width: =150
+                  - TextInput1:
+                      Control: Classic/TextInput@2.3.2
+                      Properties:
+                        BorderColor: =RGBA(245, 245, 245, 1)
+                        Color: =RGBA(50, 49, 48, 1)
+                        Default: =ItemNum
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        FillPortions: =1
+                        Font: =Font.'Segoe UI'
+                        HoverBorderColor: =RGBA(16, 110, 190, 1)
+                        HoverColor: =RGBA(50, 49, 48, 1)
+                        HoverFill: =RGBA(255, 255, 255, 1)
+                        LayoutMinWidth: =200
+                        PressedBorderColor: =RGBA(0, 120, 212, 1)
+                        PressedColor: =RGBA(50, 49, 48, 1)
+                        PressedFill: =RGBA(255, 255, 255, 1)
+                        RadiusBottomLeft: =0
+                        RadiusBottomRight: =0
+                        RadiusTopLeft: =0
+                        RadiusTopRight: =0
+                  - Icon1:
+                      Control: Classic/Icon@2.5.0
+                      Properties:
+                        AlignInContainer: =AlignInContainer.Stretch
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        Color: =RGBA(0, 120, 212, 1)
+                        DisabledBorderColor: =RGBA(245, 245, 245, 1)
+                        DisabledColor: =RGBA(225, 223, 221, 1)
+                        DisabledFill: =RGBA(0, 0, 0, 0)
+                        FocusedBorderThickness: =4
+                        HoverBorderColor: =RGBA(0, 0, 0, 0)
+                        HoverColor: =RGBA(16, 110, 190, 1)
+                        HoverFill: =RGBA(0, 0, 0, 0)
+                        Icon: =Icon.Search
+                        OnSelect: =ClearCollect(ItemList, Filter(pms_備品管理, 部品品番 = TextInput1.Text))
+                        PressedBorderColor: =RGBA(0, 0, 0, 0)
+                        PressedColor: =RGBA(16, 110, 190, 1)
+                        PressedFill: =RGBA(0, 0, 0, 0)
+            - Gallery2:
+                Control: Gallery@2.15.0
+                Variant: BrowseLayout_Vertical_TwoTextVariant_ver5.0
+                Properties:
+                  BorderColor: =RGBA(0, 120, 212, 1)
+                  BorderThickness: =1
+                  Items: =ItemList
+                  TemplateSize: =Self.Height - 10
+                Children:
+                  - Title3:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 0, 0, 1)
+                        Color: =If(ThisItem.'部品数（事務所）'+ThisItem.'部品数（車載）'=0, Color.Red, RGBA(50, 49, 48, 1))
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Bold
+                        Height: =Self.Size * 1.8
+                        OnSelect: =Select(Parent)
+                        PaddingBottom: =0
+                        PaddingLeft: =12
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Size: =20
+                        Text: |-
+                          ="部品品番: " & ThisItem.部品品番
+                        Underline: =true
+                        VerticalAlign: =VerticalAlign.Top
+                        Width: =Parent.Width -50
+                        X: =16
+                        Y: =10
+                  - Title3_1:
+                      Control: Label@2.5.1
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 1)
+                        Color: =If(ThisItem.'部品数（事務所）'+ThisItem.'部品数（車載）'=0, Color.Red, RGBA(50, 49, 48, 1))
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Bold
+                        Height: =Self.Size * 1.8
+                        OnSelect: =Select(Parent)
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Size: =14
+                        Text: ="総数"
+                        VerticalAlign: =VerticalAlign.Top
+                        Width: =80
+                        X: =Title3.X
+                        Y: =Title3.Y + Title3.Height + 10
+                  - Title3_2:
+                      Control: Label@2.5.1
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 1)
+                        Color: =If(ThisItem.'部品数（事務所）'+ThisItem.'部品数（車載）'=0, Color.Red, RGBA(50, 49, 48, 1))
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Bold
+                        Height: =Self.Size * 1.8
+                        OnSelect: =Select(Parent)
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Size: =30
+                        Text: =ThisItem.'部品数（事務所）' + ThisItem.'部品数（車載）'
+                        VerticalAlign: =VerticalAlign.Top
+                        Width: =80
+                        X: =Title3_1.X
+                        Y: =Title3_1.Y + Title3_1.Height
+                  - Title3_3:
+                      Control: Label@2.5.1
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 1)
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =Self.Size * 1.8
+                        OnSelect: =Select(Parent)
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Size: =14
+                        Text: ="事務所"
+                        VerticalAlign: =VerticalAlign.Top
+                        Width: =80
+                        X: =Title3_1.X + Title3_1.Width
+                        Y: =Title3_1.Y
+                  - Title3_4:
+                      Control: Label@2.5.1
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 1)
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =Self.Size * 1.8
+                        OnSelect: =Select(Parent)
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Size: =30
+                        Text: =ThisItem.'部品数（事務所）'
+                        VerticalAlign: =VerticalAlign.Top
+                        Width: =80
+                        X: =Title3_3.X
+                        Y: =Title3_2.Y
+                  - Title3_5:
+                      Control: Label@2.5.1
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 1)
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =Self.Size * 1.8
+                        OnSelect: =Select(Parent)
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Size: =14
+                        Text: ="車載"
+                        VerticalAlign: =VerticalAlign.Top
+                        Width: =80
+                        X: =Title3_3.X + Title3_3.Width
+                        Y: =Title3_1.Y
+                  - Title3_6:
+                      Control: Label@2.5.1
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 1)
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =Self.Size * 1.8
+                        OnSelect: =Select(Parent)
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Size: =30
+                        Text: =ThisItem.'部品数（車載）'
+                        VerticalAlign: =VerticalAlign.Top
+                        Width: =80
+                        X: =Title3_5.X
+                        Y: =Title3_2.Y
+                  - Title3_7:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 0, 0, 1)
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =Title3_5.Height
+                        OnSelect: =Select(Parent)
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Size: =14
+                        Text: ="詳細"
+                        VerticalAlign: =VerticalAlign.Top
+                        Width: =350
+                        X: =Title3_5.X + Title3_5.Width +10
+                        Y: =Title3_1.Y
+                  - Title3_8:
+                      Control: Label@2.5.1
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 1)
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =Title3_1.Height + Title3_2.Height
+                        OnSelect: =Select(Parent)
+                        PaddingBottom: =0
+                        PaddingLeft: =20
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Size: =14
+                        Text: |-
+                          =Concat(Filter(pms_車載部品,部品品番=TextInput1.Text && 部品数 > 0), '保管場所（車載）' & ": " & 部品数, Char(10))
+                        VerticalAlign: =VerticalAlign.Top
+                        Width: =350
+                        X: =Title3_5.X + Title3_5.Width +10
+                        Y: =Title3_1.Y + Title3_1.Height
+            - Container3_3:
+                Control: GroupContainer@1.4.0
+                Variant: AutoLayout
+                Properties:
+                  DropShadow: =DropShadow.None
+                  FillPortions: =0
+                  Height: =80
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutJustifyContent: =LayoutJustifyContent.Center
+                  PaddingLeft: =10
+                  PaddingRight: =10
+                Children:
+                  - Button10_3:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        Fill: =RGBA(0, 120, 212, 1)
+                        Font: =Font.'Segoe UI'
+                        HoverBorderColor: =RGBA(0, 0, 0, 0)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =RGBA(16, 110, 190, 1)
+                        OnSelect: =Navigate(TOP)
+                        PressedBorderColor: =RGBA(0, 69, 120, 1)
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(16, 110, 190, 1)
+                        RadiusBottomLeft: =0
+                        RadiusBottomRight: =0
+                        RadiusTopLeft: =0
+                        RadiusTopRight: =0
+                        Text: ="ＴＯＰ"
