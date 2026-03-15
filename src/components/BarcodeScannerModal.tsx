@@ -14,7 +14,7 @@ function isSecureContext(): boolean {
   return window.isSecureContext === true;
 }
 
-/** iOS かどうか（Safari 以外ではカメラが使えない場合がある） */
+/** iOS かどうか */
 function isIOS(): boolean {
   if (typeof navigator === "undefined") return false;
   return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -42,7 +42,7 @@ export function BarcodeScannerModal({
   const [fileScanning, setFileScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /** 写真から読み取り（iOSのLINE等カメラ不可ブラウザ用） */
+  /** 写真から読み取り（iOSでカメラが使えない場合のフォールバック） */
   const handleFileScan = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -164,7 +164,7 @@ export function BarcodeScannerModal({
         } else if (msg.includes("NotFoundError") || msg.includes("not found")) {
           setError("カメラが見つかりません。");
         } else if (isIOS()) {
-          setError("カメラを起動できませんでした。iOSではSafariで開いてください。");
+          setError("カメラを起動できませんでした。iOSの場合は「写真から読み取る」をご利用ください。");
         } else {
           setError(msg.length > 80 ? "カメラを起動できませんでした。" : msg);
         }
@@ -212,7 +212,7 @@ export function BarcodeScannerModal({
           <p className="text-center text-sm leading-relaxed">{errMessage}</p>
           {isIOS() && !showSecureError && (
             <p className="text-center text-xs text-white/80">
-              LINEなどアプリ内ブラウザではカメラが使えません。下の「写真から読み取る」をご利用ください。
+              iOSではアプリ内ブラウザ（LINEなど）でカメラが使えない場合があります。下の「写真から読み取る」をご利用ください。
             </p>
           )}
           {!showSecureError && (
@@ -279,7 +279,7 @@ export function BarcodeScannerModal({
                 {fileScanning ? "読み取り中…" : "写真から読み取る"}
               </button>
               <p className="text-center text-xs text-white/60">
-                LINEなどではこちらをご利用ください
+                iOSではこちらをご利用ください
               </p>
             </>
           )}
