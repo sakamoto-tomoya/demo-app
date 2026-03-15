@@ -54,7 +54,7 @@ export function BarcodeScannerModal({
     return () => clearTimeout(t);
   }, [open]);
 
-  // html5-qrcode でカメラ起動（getCameras → 裏カメラ優先で start）
+  // html5-qrcode でカメラ起動（高解像度指定でぼけ軽減・1Dバーコード用に枠を広めに）
   useEffect(() => {
     if (!open || !containerReady || !isSecureContext()) return;
 
@@ -74,38 +74,28 @@ export function BarcodeScannerModal({
         const { Html5Qrcode } = await import("html5-qrcode");
         if (cancelled) return;
 
-        const cameras = await Html5Qrcode.getCameras();
-        if (cancelled) return;
-
-        if (!cameras || cameras.length === 0) {
-          setError(
-            isIOS()
-              ? "カメラが見つかりません。iOSではSafariで開くか、「設定」でカメラの許可を確認してください。"
-              : "カメラが見つかりません。ブラウザのカメラ許可を確認してください。"
-          );
-          setLoading(false);
-          return;
-        }
-
-        // 裏カメラ（バーコード用）を優先。ラベルに back / rear / 環境 を含むもの、または末尾を利用
-        const backLabel = /back|rear|environment|環境|背面/i;
-        const backCam = cameras.find((c) => backLabel.test(c.label));
-        const cameraId = backCam ? backCam.id : cameras[cameras.length - 1].id;
-
         const scanner = new Html5Qrcode(BARCODE_SCANNER_CONTAINER_ID);
         html5QrRef.current = scanner;
 
+        // 裏カメラ + 高解像度でぼけを軽減（ideal でできるだけシャープなストリームを要求）
+        const cameraConstraints: MediaTrackConstraints = {
+          facingMode: "environment",
+          width: { ideal: 1920, min: 640 },
+          height: { ideal: 1080, min: 480 },
+        };
+
+        // 1Dバーコード用: 枠を横長・広めにして読み取りやすく
         const config = {
           fps: 10,
           qrbox: (w: number, h: number) => ({
-            width: Math.max(120, Math.min(280, w - 24)),
-            height: Math.max(80, Math.min(180, h - 24)),
+            width: Math.max(200, Math.min(w - 32, 400)),
+            height: Math.max(100, Math.min(180, Math.floor(h * 0.35))),
           }),
-          aspectRatio: 1.0,
+          aspectRatio: 1.333,
         };
 
         await scanner.start(
-          cameraId,
+          cameraConstraints,
           config,
           (decodedText: string) => {
             scanner.stop().then(() => {
@@ -153,15 +143,18 @@ export function BarcodeScannerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex min-h-[100dvh] flex-col bg-black">
-      <div className="flex shrink-0 items-center justify-between p-3 text-white">
-        <span className="text-sm font-medium">バーコードを枠内に合わせてください</span>
-        <button
+      <div className="flex shrink-0 flex-col gap-1 p-3">
+        <div className="flex items-center justify-between text-white">
+          <span className="text-sm font-medium">バーコードを枠内に合わせてください</span>
+          <button
           type="button"
           onClick={onClose}
           className="rounded bg-white/20 px-3 py-1.5 text-sm"
-        >
-          閉じる
-        </button>
+          >
+            閉じる
+          </button>
+        </div>
+        <p className="text-xs text-white/70">読めないときは、バーコードに近づくか少し離してピントを合わせてください</p>
       </div>
 
       {showSecureError || error ? (
