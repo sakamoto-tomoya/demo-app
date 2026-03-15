@@ -396,7 +396,7 @@ export default function CompleteCasePage() {
               href="/"
               className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--foreground)] no-underline hover:bg-[var(--border)]"
             >
-              ダッシュボードへ
+              業務ダッシュボードへ
             </Link>
           </div>
         </div>

@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const links = [
-  { href: "/cases/new", label: "新規受付登録" },
-  { href: "/", label: "全体進捗状況" },
-  { href: "/map", label: "全依頼案件MAP" },
+  { href: "/cases/new", label: "案件管理" },
+  { href: "/", label: "業務ダッシュボード" },
+  { href: "/map", label: "訪問先マップ" },
   { href: "/calendar", label: "担当者別スケジュール" },
   { href: "/history", label: "履歴検索" },
 ];
@@ -34,7 +34,7 @@ export default function Nav() {
       >
         <img
           src="/logo.png?v=4"
-          alt="GasLink 依頼と現場をつなぐ"
+          alt="AI修理業務管理システム"
           className="max-h-24 w-full object-contain object-left"
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -131,7 +131,7 @@ export default function Nav() {
         <Link href="/" className="flex items-center text-[var(--primary)] no-underline">
           <img
             src="/logo.png?v=4"
-            alt="GasLink"
+            alt="AI修理業務管理システム"
             className="h-8 w-auto object-contain"
             onError={(e) => {
               e.currentTarget.style.display = "none";

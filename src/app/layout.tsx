@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "業務管理アプリ",
-  description: "受付・フィールド業務の効率化のための統合業務管理",
+  title: "AI修理業務管理システム",
+  description: "現場対応が必要な修理・保守業務を効率化するための業務支援アプリ",
 };
 
 export const viewport = {

@@ -11,10 +11,10 @@ export default function NewCasePage() {
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-bold text-[var(--foreground)] sm:text-2xl">
-        新規案件登録
+        案件管理
       </h1>
       <p className="text-[var(--muted)]">
-        PDFをアップロードすると項目を自動転記します。手入力も可能です。
+        PDFをアップロードすると書類OCRで項目を自動転記します。手入力も可能です。
       </p>
       <CaseForm
         onSuccess={() => router.push("/")}
