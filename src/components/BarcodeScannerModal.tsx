@@ -4,6 +4,12 @@ import { useEffect, useState, useRef, useCallback } from "react";
 
 const BARCODE_SCANNER_FALLBACK_ID = "barcode-scanner-fallback";
 
+/** セキュアコンテキストか（カメラは HTTPS または localhost 必須） */
+function isSecureContext(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.isSecureContext === true;
+}
+
 /** スマホ用バーコード読取モーダル（Android: BarcodeDetector / iOS: html5-qrcode） */
 export function BarcodeScannerModal({
   open,
@@ -22,6 +28,7 @@ export function BarcodeScannerModal({
   const [error, setError] = useState<string | null>(null);
   const [useFallback, setUseFallback] = useState(false);
   const [fallbackLoading, setFallbackLoading] = useState(false);
+  const [secureContextError, setSecureContextError] = useState(false);
 
   const stopCamera = useCallback(() => {
     if (rafRef.current) {
@@ -34,6 +41,15 @@ export function BarcodeScannerModal({
     }
   }, []);
 
+  // 非セキュアコンテキスト（HTTP 等）ではカメラ不可
+  useEffect(() => {
+    if (!open) {
+      setSecureContextError(false);
+      return;
+    }
+    setSecureContextError(!isSecureContext());
+  }, [open]);
+
   // BarcodeDetector（Android 等）
   useEffect(() => {
     if (!open || useFallback) {
@@ -41,6 +57,8 @@ export function BarcodeScannerModal({
       setError(null);
       return;
     }
+
+    if (!isSecureContext()) return;
 
     const hasBarcodeDetector =
       typeof window !== "undefined" && "BarcodeDetector" in window;
@@ -110,7 +128,7 @@ export function BarcodeScannerModal({
 
   // html5-qrcode（iOS Safari 等フォールバック）
   useEffect(() => {
-    if (!open || !useFallback) {
+    if (!open || !useFallback || !isSecureContext()) {
       return;
     }
 
@@ -118,44 +136,58 @@ export function BarcodeScannerModal({
     setError(null);
 
     let cancelled = false;
-    import("html5-qrcode")
-      .then(({ Html5Qrcode }) => {
-        if (cancelled) return;
-        const scanner = new Html5Qrcode(BARCODE_SCANNER_FALLBACK_ID);
-        html5QrRef.current = scanner;
-        const config = {
-          fps: 5,
-          qrbox: { width: 260, height: 160 },
-        };
-        return scanner
-          .start(
-            { facingMode: "environment" },
-            config,
-            (decodedText: string) => {
-              scanner.stop().then(() => {
-                html5QrRef.current = null;
-                onDetected(decodedText);
-                onClose();
-              });
-            },
-            () => {}
-          )
-          .then(() => setFallbackLoading(false))
-          .catch((err: unknown) => {
-            if (!cancelled) {
-              setError(
-                err instanceof Error ? err.message : "カメラを起動できませんでした"
-              );
-              setFallbackLoading(false);
-            }
-          });
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setError("スキャナの読み込みに失敗しました");
-          setFallbackLoading(false);
-        }
-      });
+    // スマホでコンテナがレイアウトされるまで待ってから開始（0x0 だとカメラが起動しない）
+    const startAfterLayout = () => {
+      const el = document.getElementById(BARCODE_SCANNER_FALLBACK_ID);
+      if (cancelled || !el) return;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 50 || rect.height < 50) {
+        requestAnimationFrame(startAfterLayout);
+        return;
+      }
+      import("html5-qrcode")
+        .then(({ Html5Qrcode }) => {
+          if (cancelled) return;
+          const scanner = new Html5Qrcode(BARCODE_SCANNER_FALLBACK_ID);
+          html5QrRef.current = scanner;
+          const config = {
+            fps: 5,
+            qrbox: (w: number, h: number) => ({
+            width: Math.max(100, Math.min(260, w - 20)),
+            height: Math.max(80, Math.min(160, h - 20)),
+          }),
+          };
+          return scanner
+            .start(
+              { facingMode: "environment" },
+              config,
+              (decodedText: string) => {
+                scanner.stop().then(() => {
+                  html5QrRef.current = null;
+                  onDetected(decodedText);
+                  onClose();
+                });
+              },
+              () => {}
+            )
+            .then(() => setFallbackLoading(false))
+            .catch((err: unknown) => {
+              if (!cancelled) {
+                setError(
+                  err instanceof Error ? err.message : "カメラを起動できませんでした"
+                );
+                setFallbackLoading(false);
+              }
+            });
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setError("スキャナの読み込みに失敗しました");
+            setFallbackLoading(false);
+          }
+        });
+    };
+    requestAnimationFrame(() => requestAnimationFrame(startAfterLayout));
 
     return () => {
       cancelled = true;
@@ -176,9 +208,14 @@ export function BarcodeScannerModal({
 
   if (!open) return null;
 
+  const showSecureError = secureContextError;
+  const errMessage = showSecureError
+    ? "カメラは HTTPS でご利用ください。スマホではアドレスが https:// のページで開いてください。"
+    : error;
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black">
-      <div className="flex items-center justify-between p-3 text-white">
+    <div className="fixed inset-0 z-50 flex min-h-[100dvh] flex-col bg-black">
+      <div className="flex shrink-0 items-center justify-between p-3 text-white">
         <span className="text-sm font-medium">バーコードを枠内に合わせてください</span>
         <button
           type="button"
@@ -190,9 +227,9 @@ export function BarcodeScannerModal({
       </div>
       {useFallback ? (
         <>
-          {error ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-white">
-              <p className="text-center text-sm">{error}</p>
+          {error || showSecureError ? (
+            <div className="flex min-h-[200px] flex-1 flex-col items-center justify-center gap-2 p-4 text-white">
+              <p className="text-center text-sm">{errMessage}</p>
               <button
                 type="button"
                 onClick={onClose}
@@ -202,7 +239,7 @@ export function BarcodeScannerModal({
               </button>
             </div>
           ) : (
-            <div className="relative flex-1 min-h-0">
+            <div className="relative flex min-h-0 flex-1 flex-col">
               {fallbackLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-white">
                   <span className="text-sm">読取準備中…</span>
@@ -210,14 +247,14 @@ export function BarcodeScannerModal({
               )}
               <div
                 id={BARCODE_SCANNER_FALLBACK_ID}
-                className="h-full w-full [&_video]:!object-cover"
+                className="min-h-[300px] h-full w-full [&_video]:!object-cover"
               />
             </div>
           )}
         </>
-      ) : error ? (
+      ) : error || showSecureError ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-white">
-          <p className="text-center text-sm">{error}</p>
+          <p className="text-center text-sm">{errMessage}</p>
           <button
             type="button"
             onClick={onClose}
