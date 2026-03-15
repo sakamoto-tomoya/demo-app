@@ -21,8 +21,9 @@ function hasAccessCookie(req: NextRequest): boolean {
 const withNextAuth = auth((req) => {
   const isLoggedIn = !!req.auth;
   const isAuthPage = req.nextUrl.pathname.startsWith("/api/auth");
-  const isHome = req.nextUrl.pathname === "/";
-  if (!isLoggedIn && !isAuthPage && !isHome) {
+  const isLandingOrDashboard =
+    req.nextUrl.pathname === "/" || req.nextUrl.pathname === "/dashboard";
+  if (!isLoggedIn && !isAuthPage && !isLandingOrDashboard) {
     return Response.redirect(new URL("/", req.url));
   }
   return undefined;

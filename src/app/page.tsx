@@ -1,4 +1,4 @@
-import { auth, signIn, signOut } from "@/auth";
+import { auth, signOut } from "@/auth";
 import StatusCards from "@/components/StatusCards";
 import Link from "next/link";
 
@@ -18,19 +18,12 @@ export default async function Home() {
               現場対応が必要な修理・保守業務を、OCR・地図・案件管理・部品管理・入金管理で一元化する業務支援アプリ
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <form
-                action={async () => {
-                  "use server";
-                  await signIn("google", { redirectTo: "/" });
-                }}
+              <Link
+                href="/dashboard"
+                className="app-btn app-btn-primary px-8 py-3.5 text-base shadow-[var(--shadow)]"
               >
-                <button
-                  type="submit"
-                  className="app-btn app-btn-primary px-8 py-3.5 text-base shadow-[var(--shadow)]"
-                >
-                  デモを見る
-                </button>
-              </form>
+                デモを見る
+              </Link>
               <Link
                 href="#features"
                 className="app-btn app-btn-secondary inline-flex items-center gap-2 px-8 py-3.5 text-base shadow-[var(--shadow-sm)]"
