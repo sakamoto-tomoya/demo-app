@@ -19,12 +19,6 @@ export default async function Home() {
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
-                href="/dashboard"
-                className="app-btn app-btn-primary px-8 py-3.5 text-base shadow-[var(--shadow)]"
-              >
-                デモを見る
-              </Link>
-              <Link
                 href="#features"
                 className="app-btn app-btn-secondary inline-flex items-center gap-2 px-8 py-3.5 text-base shadow-[var(--shadow-sm)]"
               >
