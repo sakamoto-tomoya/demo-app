@@ -109,6 +109,13 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - **レート制限**: 現在は **デモ用の簡易レート制限（メモリ実装）** です。同一インスタンス内で 1 分あたり約 120 リクエスト/IP まで。**本番運用では Upstash Redis 等の外部ストアを使ったレート制限を推奨**します。
 - セキュリティ詳細: [docs/SECURITY-AUDIT-DEMO.md](docs/SECURITY-AUDIT-DEMO.md) / [docs/SECURITY-DEMO-FOLLOWUP.md](docs/SECURITY-DEMO-FOLLOWUP.md)
 
+### 動作確認端末（バーコード読取・スマホ向け）
+
+- **iPhone 11 Pro** / **iPhone SE**（Safari でカメラ・写真・手入力）
+- **Android**（Chrome でカメラ・写真・手入力）
+
+※ iOS のアプリ内ブラウザ（LINE 等）ではカメラが使えないため、カメラ利用時は Safari で開くか「写真から読み取る」「手入力」を利用してください。詳細は [docs/BARCODE-SCANNER-IMPROVEMENT.md](docs/BARCODE-SCANNER-IMPROVEMENT.md) を参照。
+
 ---
 
 ## 公開デモ時の注意点（要約）
