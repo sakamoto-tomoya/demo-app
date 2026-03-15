@@ -3,6 +3,10 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 
 const BARCODE_SCANNER_CONTAINER_ID = "barcode-scanner-container";
+const BARCODE_FILE_SCAN_PLACEHOLDER_ID = "barcode-file-scan-placeholder";
+
+/** 閉じる前にカメラ解放を待つ時間（2回目以降の起動失敗を防ぐ） */
+const CAMERA_RELEASE_DELAY_MS = 600;
 
 /** セキュアコンテキストか（カメラは HTTPS または localhost 必須） */
 function isSecureContext(): boolean {
@@ -16,15 +20,9 @@ function isIOS(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
-/** スマホ・タブレットか */
-function isMobileDevice(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return "maxTouchPoints" in navigator && navigator.maxTouchPoints > 0 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-}
-
 /**
  * Android / iOS 兼用バーコード読取モーダル
- * html5-qrcode のみ使用（getCameras + 裏カメラ優先で両OSで安定動作）
+ * 閉じるときにカメラを解放してから onClose するため、出庫・2回目以降も読める
  */
 export function BarcodeScannerModal({
   open,
@@ -39,19 +37,69 @@ export function BarcodeScannerModal({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [secureContextError, setSecureContextError] = useState(false);
+  const [scanStarted, setScanStarted] = useState(false);
   const [containerReady, setContainerReady] = useState(false);
+  const [fileScanning, setFileScanning] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 非セキュアコンテキスト
+  /** 写真から読み取り（iOSのLINE等カメラ不可ブラウザ用） */
+  const handleFileScan = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if (!file || !file.type.startsWith("image/")) return;
+      setFileScanning(true);
+      try {
+        const { Html5Qrcode } = await import("html5-qrcode");
+        const placeholder = document.getElementById(BARCODE_FILE_SCAN_PLACEHOLDER_ID);
+        if (!placeholder) {
+          setFileScanning(false);
+          return;
+        }
+        const scanner = new Html5Qrcode(BARCODE_FILE_SCAN_PLACEHOLDER_ID);
+        const decoded = await scanner.scanFile(file, false);
+        if (decoded) {
+          onDetected(decoded);
+          onClose();
+        }
+      } catch {
+        setError("画像からバーコードを読み取れませんでした。はっきり写った写真を選んでください。");
+      }
+      setFileScanning(false);
+    },
+    [onDetected, onClose]
+  );
+
+  /** 読取開始ボタン押下 → コンテナ準備後にスキャン開始 */
+  const handleStartScan = useCallback(() => {
+    setScanStarted(true);
+    setError(null);
+    setTimeout(() => setContainerReady(true), 300);
+  }, []);
+
+  /** カメラを止めてから少し待ってから onClose（2回目以降の起動失敗を防ぐ） */
+  const closeWithRelease = useCallback(() => {
+    const scanner = html5QrRef.current;
+    html5QrRef.current = null;
+    if (scanner) {
+      scanner
+        .stop()
+        .catch(() => {})
+        .then(() => setTimeout(onClose, CAMERA_RELEASE_DELAY_MS));
+    } else {
+      onClose();
+    }
+  }, [onClose]);
+
+  // 開閉時のリセット（読取開始はボタンで行う）
   useEffect(() => {
     if (!open) {
       setSecureContextError(false);
+      setScanStarted(false);
       setContainerReady(false);
       return;
     }
     setSecureContextError(!isSecureContext());
-    // コンテナが DOM に描画されてサイズが取れるまで少し待つ（Android/iOS で必須）
-    const t = setTimeout(() => setContainerReady(true), 350);
-    return () => clearTimeout(t);
   }, [open]);
 
   // html5-qrcode でカメラ起動（高解像度指定でぼけ軽減・1Dバーコード用に枠を広めに）
@@ -98,10 +146,10 @@ export function BarcodeScannerModal({
           cameraConstraints,
           config,
           (decodedText: string) => {
-            scanner.stop().then(() => {
-              html5QrRef.current = null;
+            html5QrRef.current = null;
+            scanner.stop().catch(() => {}).then(() => {
               onDetected(decodedText);
-              onClose();
+              setTimeout(onClose, CAMERA_RELEASE_DELAY_MS);
             });
           },
           () => {}
@@ -143,12 +191,14 @@ export function BarcodeScannerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex min-h-[100dvh] flex-col bg-black">
+      {/* 写真スキャン用（html5-qrcode が要素を要求するため非表示で常時配置） */}
+      <div id={BARCODE_FILE_SCAN_PLACEHOLDER_ID} className="sr-only" aria-hidden />
       <div className="flex shrink-0 flex-col gap-1 p-3">
         <div className="flex items-center justify-between text-white">
           <span className="text-sm font-medium">バーコードを枠内に合わせてください</span>
           <button
           type="button"
-          onClick={onClose}
+          onClick={closeWithRelease}
           className="rounded bg-white/20 px-3 py-1.5 text-sm"
           >
             閉じる
@@ -158,17 +208,85 @@ export function BarcodeScannerModal({
       </div>
 
       {showSecureError || error ? (
-        <div className="flex min-h-[200px] flex-1 flex-col items-center justify-center gap-3 p-4 text-white">
+        <div className="flex min-h-[200px] flex-1 flex-col items-center justify-center gap-4 p-4 text-white">
           <p className="text-center text-sm leading-relaxed">{errMessage}</p>
           {isIOS() && !showSecureError && (
             <p className="text-center text-xs text-white/80">
-              iPhone・iPadでは「Safari」で開くとカメラが使えます。
+              LINEなどアプリ内ブラウザではカメラが使えません。下の「写真から読み取る」をご利用ください。
             </p>
+          )}
+          {!showSecureError && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                aria-hidden
+                onChange={handleFileScan}
+                disabled={fileScanning}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={fileScanning}
+                className="rounded-xl bg-[var(--primary)] px-6 py-3 text-sm font-medium text-[var(--primary-foreground)] disabled:opacity-60"
+              >
+                {fileScanning ? "読み取り中…" : "写真から読み取る"}
+              </button>
+              <p className="text-center text-xs text-white/60">
+                バーコードが写った写真を選ぶと読み取れます
+              </p>
+            </>
           )}
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeWithRelease}
             className="mt-2 rounded bg-white/20 px-4 py-2 text-sm"
+          >
+            閉じる
+          </button>
+        </div>
+      ) : !scanStarted ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
+          <p className="text-center text-sm text-white/80">
+            カメラでバーコードを読み取ります
+          </p>
+          <button
+            type="button"
+            onClick={handleStartScan}
+            className="rounded-xl bg-[var(--primary)] px-8 py-4 text-base font-medium text-[var(--primary-foreground)] shadow-lg"
+          >
+            読取開始
+          </button>
+          {isIOS() && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                aria-hidden
+                onChange={handleFileScan}
+                disabled={fileScanning}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={fileScanning}
+                className="rounded-lg border border-white/40 bg-white/10 px-6 py-3 text-sm text-white"
+              >
+                {fileScanning ? "読み取り中…" : "写真から読み取る"}
+              </button>
+              <p className="text-center text-xs text-white/60">
+                LINEなどではこちらをご利用ください
+              </p>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={closeWithRelease}
+            className="text-sm text-white/70 underline"
           >
             閉じる
           </button>
