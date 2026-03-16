@@ -87,6 +87,7 @@ export function BarcodeScannerModal({
           return;
         }
         const scanner = new Html5Qrcode(BARCODE_FILE_SCAN_PLACEHOLDER_ID, {
+          verbose: false,
           formatsToSupport: [
             Html5QrcodeSupportedFormats.QR_CODE,
             Html5QrcodeSupportedFormats.CODE_128,
@@ -176,6 +177,7 @@ export function BarcodeScannerModal({
         if (cancelled) return;
 
         const scanner = new Html5Qrcode(BARCODE_SCANNER_CONTAINER_ID, {
+          verbose: false,
           formatsToSupport: [
             Html5QrcodeSupportedFormats.QR_CODE,
             Html5QrcodeSupportedFormats.CODE_128,
