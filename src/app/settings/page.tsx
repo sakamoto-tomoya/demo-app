@@ -109,10 +109,37 @@ export default function SettingsPage() {
   if (authStatus === "unconfigured") {
     return (
       <div className="space-y-6">
-        <h1 className="text-xl font-bold text-[var(--foreground)] sm:text-2xl">設定</h1>
+        <h1 className="text-xl font-bold text-[var(--foreground)] sm:text-2xl">各種設定</h1>
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--alert-bg)] p-4 text-sm text-[var(--alert)]">
+          デモ用表示です。SETTINGS_PASSWORD が未設定のため変更はできません。画面構成の参考として表示しています。
+        </div>
         <p className="text-[var(--muted)]">
-          公開デモのため設定は利用できません。管理者により無効化されています。
+          各種設定を登録できます。（本番では管理者パスワードを設定すると利用可能になります）
         </p>
+
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6">
+          <h2 className="mb-4 text-base font-semibold text-[var(--foreground)] border-b border-[var(--border)] pb-2">
+            ユーザー・担当者登録
+          </h2>
+          <p className="mb-4 text-sm text-[var(--muted)]">
+            名前・メールアドレス・パスワードと担当を登録します。管理者・受付・現場・入庫・出庫・経理などの役割を割り当てられます。
+          </p>
+          <p className="rounded bg-[var(--background)] p-4 text-sm text-[var(--muted)]">
+            （デモではユーザー一覧は表示しません。本番で SETTINGS_PASSWORD を設定すると利用できます）
+          </p>
+        </section>
+
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6">
+          <h2 className="mb-4 text-base font-semibold text-[var(--foreground)] border-b border-[var(--border)] pb-2">
+            メール設定
+          </h2>
+          <p className="mb-4 text-sm text-[var(--muted)]">
+            入庫通知などで使用するSMTP設定を登録します。
+          </p>
+          <p className="rounded bg-[var(--background)] p-4 text-sm text-[var(--muted)]">
+            （デモでは表示・変更はできません）
+          </p>
+        </section>
       </div>
     );
   }
