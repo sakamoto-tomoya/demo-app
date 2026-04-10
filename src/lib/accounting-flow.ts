@@ -31,8 +31,8 @@ export type AutoMatchResult = {
  * 案件と銀行入金データを自動照合し、一致した案件を入金済に更新する。
  * 請求書を発行した案件（invoiceIssuedAt が設定されている案件）のみ対象。
  */
-export function runAutoMatch(): AutoMatchResult {
-  const cases = getAllCases();
+export async function runAutoMatch(): Promise<AutoMatchResult> {
+  const cases = await getAllCases();
   const relevant = cases.filter(isInvoiceIssuedCase);
   const details: AutoMatchResult["details"] = [];
   let updated = 0;
@@ -46,7 +46,7 @@ export function runAutoMatch(): AutoMatchResult {
       matched,
     });
     if (matched && !c.completionPaymentReceived) {
-      updateCase(c.id, { completionPaymentReceived: true });
+      await updateCase(c.id, { completionPaymentReceived: true });
       updated++;
     }
   }

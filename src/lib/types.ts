@@ -45,6 +45,56 @@ export const ALERT_TARGET_STATUSES: CaseStatus[] = [
 /** アラート基準日数（登録日から何日後で色分けするか） */
 export const ALERT_DAYS_THRESHOLD = 5;
 
+/** 器具分類（Difyナレッジ・完了詳細用） */
+export const APPLIANCE_CATEGORY_OPTIONS = [
+  "ビルトインコンロ",
+  "テーブルコンロ",
+  "給湯器",
+  "湯沸し器",
+  "業務用炊飯器",
+  "その他",
+] as const;
+export type ApplianceCategory = (typeof APPLIANCE_CATEGORY_OPTIONS)[number];
+
+/** 症状分類（Difyナレッジ・完了詳細用） */
+export const SYMPTOM_CATEGORY_OPTIONS = [
+  "点火不良",
+  "点火後消火",
+  "火力不安定",
+  "エラー表示",
+  "お湯が出ない",
+  "ガス臭い",
+  "その他",
+] as const;
+export type SymptomCategory = (typeof SYMPTOM_CATEGORY_OPTIONS)[number];
+
+/** 作業結果（Difyナレッジ・完了詳細用） */
+export const WORK_RESULT_OPTIONS = [
+  "正常復旧",
+  "改善",
+  "未改善",
+  "経過観察",
+  "部品手配待ち",
+] as const;
+export type WorkResult = (typeof WORK_RESULT_OPTIONS)[number];
+
+/** 完了詳細（Difyナレッジ連携用・パロマ固定） */
+export interface CompletionDetail {
+  manufacturer: string;
+  category: string;
+  model: string;
+  inquiry_content: string;
+  symptom_category: string;
+  confirmed_cause: string;
+  part_number: string;
+  part_name: string;
+  work_detail: string;
+  work_result: string;
+  note: string;
+  solution_summary: string;
+  is_completed: boolean;
+}
+
 /** 出張修理依頼書（パロマ社内用）に準拠した案件データ */
 export interface CaseRecord {
   id: string;
@@ -116,6 +166,20 @@ export interface CaseRecord {
   gasType?: string;
   /** 問合/依頼内容（症状・使用年数・請求先等） */
   inquiryContent?: string;
+  /** 問合内容の生テキスト（分解前） */
+  inquiry_raw?: string;
+  /** 問合先頭行から抽出した型式候補 */
+  model_candidate?: string;
+  /** 症状（問合内ラベルから分解） */
+  symptom?: string;
+  /** 使用年数（購入日）メモ（問合内ラベルから分解） */
+  usage_years_note?: string;
+  /** 連絡日時メモ（問合内ラベルから分解） */
+  contact_datetime_note?: string;
+  /** 訪問希望日メモ（問合内ラベルから分解） */
+  preferred_visit_note?: string;
+  /** 費用説明メモ（問合内ラベルから分解） */
+  fee_explanation_note?: string;
   /** 社内連絡 */
   internalContact?: string;
   /** その他メモ */
@@ -215,7 +279,34 @@ export interface CaseRecord {
   completionAfterWorkPhotos?: string[];
   /** 完了処理：お客様サイン画像（Data URL） */
   completionCustomerSignatureDataUrl?: string;
+  /** 完了詳細（Difyナレッジ連携用・症状分類・確定原因・解決方法要約など） */
+  completionDetail?: CompletionDetail;
+  /** Difyナレッジへ登録済みか */
+  difySynced?: boolean;
+  /** Dify登録日時（ISO文字列） */
+  difySyncedAt?: string | null;
+  /** DifyドキュメントID（登録成功時に取得できれば保存） */
+  difyDocumentId?: string | null;
+  /** Dify登録失敗時のエラーメッセージ */
+  difySyncError?: string | null;
+  /** 最後にDifyへ送った本文のSHA-256ハッシュ（内容変更検知・再送スキップ用） */
+  difyContentHash?: string | null;
+
+  /** 未確認で登録した項目名の一覧（未アクション表示・現場での警告表示・追記で削除） */
+  unconfirmed_fields?: string[];
+
+  /** 完了報告書：初回生成日時（ISO文字列）。永続DB用。 */
+  report_generated_at?: string | null;
+  /** 完了報告書：生成/ダウンロード状態。永続DB用。 */
+  report_status?: ReportStatus | null;
+  /** 完了報告書：バージョン（任意） */
+  report_version?: string | null;
+  /** 完了報告書：最終ダウンロード日時（ISO文字列・任意） */
+  report_last_downloaded_at?: string | null;
 }
+
+/** 完了報告書の生成・ダウンロード状態 */
+export type ReportStatus = "not_generated" | "generated" | "downloaded";
 
 export type CaseRecordInput = Omit<CaseRecord, "id" | "createdAt"> & {
   id?: string;

@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import CalendarView from "@/components/CalendarView";
-import { getFieldHandlerNames } from "@/lib/settings";
+import { getAssigneeNames } from "@/lib/settings";
 import type { CaseStatus } from "@/lib/types";
 
 const VALID_STATUSES: CaseStatus[] = [
@@ -23,6 +23,7 @@ function CalendarContent() {
   const searchParams = useSearchParams();
   const statusParam = searchParams.get("status");
   const assigneeParam = searchParams.get("assignee");
+  const selectedDateParam = searchParams.get("selectedDate");
   const statusFilter: CaseStatus | null =
     statusParam && VALID_STATUSES.includes(statusParam as CaseStatus)
       ? (statusParam as CaseStatus)
@@ -33,6 +34,7 @@ function CalendarContent() {
     <CalendarView
       statusFilter={statusFilter}
       assigneeFilter={assigneeFilter}
+      selectedDateFromQuery={selectedDateParam}
     />
   );
 }
@@ -43,7 +45,15 @@ function AssigneeSelectScreen() {
   const [selected, setSelected] = useState("");
 
   useEffect(() => {
-    setAssigneeNames(getFieldHandlerNames());
+    fetch("/api/settings/user-names")
+      .then((res) => res.json())
+      .then((data: { names?: string[] }) => {
+        const names = Array.isArray(data?.names)
+          ? data.names.filter((n) => typeof n === "string" && n.trim())
+          : [];
+        setAssigneeNames(names.length > 0 ? names : getAssigneeNames());
+      })
+      .catch(() => setAssigneeNames(getAssigneeNames()));
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {

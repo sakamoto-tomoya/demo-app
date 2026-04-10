@@ -1,19 +1,30 @@
+/**
+ * OCR API: Document AI 本番 または Mock（ポートフォリオ用のみ）
+ * - DOCUMENT_AI_USE_MOCK=true のときのみ Mock（data/ocr-mock の JSON を返す）
+ * - 本番: 環境変数がそろっていれば Google Document AI を呼ぶ
+ * - 環境変数不足・Document AI エラー時はエラーを返す（クライアント側で実PDFの埋め込みテキスト/Tesseract にフォールバック）
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { parseOcrText } from "@/lib/ocr-parse";
 import type { OcrResult } from "@/lib/ocr-parse";
+import type { OcrFieldMapping } from "@/lib/ocr-types";
+import { loadMockOcrData } from "@/lib/ocr-mock";
+import { loadOcrReference } from "@/lib/ocr-reference";
 import { requireAccessAuth } from "@/lib/access-auth";
 import { isDemoMode } from "@/lib/demo-mode";
 import { checkRateLimit } from "@/lib/rate-limit";
 
-/** 成功時のレスポンス */
+/** 成功時のレスポンス（本番: Document AI、Mock: 事前保存JSON） */
 export type OcrGoogleSuccessResponse = {
   success: true;
-  source: "google-document-ai";
+  source: "google-document-ai" | "mock";
   text: string;
   parsed: OcrResult;
+  /** Mock 時のみ。項目ごとの信頼度・バウンディングボックス */
+  mock?: boolean;
+  mapping?: OcrFieldMapping;
 };
 
-/** 失敗時のレスポンス */
 export type OcrGoogleErrorResponse = {
   success: false;
   error: string;
@@ -24,6 +35,8 @@ export type OcrGoogleResponse = OcrGoogleSuccessResponse | OcrGoogleErrorRespons
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID ?? process.env.GCLOUD_PROJECT;
 const LOCATION = process.env.DOCUMENT_AI_LOCATION ?? "us";
 const PROCESSOR_ID = process.env.DOCUMENT_AI_PROCESSOR_ID;
+/** 明示的に Mock を使う（DOCUMENT_AI_USE_MOCK=true で Billing なしでも動作） */
+const USE_MOCK = process.env.DOCUMENT_AI_USE_MOCK === "true";
 
 export async function POST(request: NextRequest): Promise<NextResponse<OcrGoogleResponse>> {
   const fail = (error: string): NextResponse<OcrGoogleErrorResponse> =>
@@ -41,6 +54,23 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrGoogle
     );
   }
 
+  // ----- Mock モード: ポートフォリオ用。環境変数不要・Billing 不要 -----
+  if (USE_MOCK) {
+    const mockData = loadMockOcrData();
+    if (mockData) {
+      return NextResponse.json({
+        success: true,
+        source: "mock",
+        text: mockData.text,
+        parsed: mockData.parsed,
+        mock: true,
+        mapping: mockData.mapping,
+      });
+    }
+    return fail("Mock データが見つかりません。data/ocr-mock/sample.documentai.json と sample.mapping.json を配置してください。");
+  }
+
+  // ----- 本番: 環境変数が不足している場合はエラー（クライアントで実PDF解析にフォールバック） -----
   if (!PROJECT_ID || !PROCESSOR_ID) {
     return fail("Google Document AI が未設定です。GOOGLE_CLOUD_PROJECT_ID と DOCUMENT_AI_PROCESSOR_ID を設定してください。");
   }
@@ -81,7 +111,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrGoogle
       return fail("Document AI からテキストを取得できませんでした。スキャン品質やページ数を確認してください。");
     }
 
-    const parsed = parseOcrText(text);
+    const reference = loadOcrReference();
+    const parsed = parseOcrText(text, reference);
     return NextResponse.json({
       success: true,
       source: "google-document-ai",
@@ -89,8 +120,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrGoogle
       parsed,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Document AI の処理に失敗しました。";
-    console.error("[ocr-google]", message);
+    const raw = err instanceof Error ? err.message : String(err);
+    const isCredentialNotFound =
+      /ENOENT|does not exist|no such file|credentials|key file/i.test(raw) ||
+      (err as NodeJS.ErrnoException)?.code === "ENOENT";
+    const message = isCredentialNotFound
+      ? "Google Cloud の認証鍵ファイルが見つかりません。.env.local の GOOGLE_APPLICATION_CREDENTIALS を設定してください。"
+      : raw || "Document AI の処理に失敗しました。";
+    console.error("[ocr-google]", raw);
     return fail(message);
   }
 }

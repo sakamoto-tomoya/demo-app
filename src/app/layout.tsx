@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Nav from "@/components/Nav";
+import { AppShell } from "@/components/AppShell";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,8 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI修理業務管理システム",
-  description: "現場対応が必要な修理・保守業務を効率化するための業務支援アプリ",
+  title: "業務Webアプリ開発 AIチャットボット実装",
+  description:
+    "受付・案件管理・OCR・地図・部品・入金・ナレッジを統合した業務Webアプリと、AIチャットボット実装のポートフォリオ用デモです。",
 };
 
 export const viewport = {
@@ -32,15 +33,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
+      <head>
+        <meta charSet="utf-8" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}
       >
-        <div className="flex min-h-screen">
-          <Nav />
-          <main className="min-w-0 flex-1 px-4 pb-8 pt-14 md:px-8 md:pt-8 lg:px-10 lg:pt-10">
-            {children}
-          </main>
-        </div>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

@@ -3,39 +3,31 @@
 import type { CaseRecord, CaseStatus } from "./types";
 import { ALERT_DAYS_THRESHOLD, ALERT_TARGET_STATUSES } from "./types";
 
-const STORAGE_KEY = "gyoumukannri_cases";
-
-function loadCases(): CaseRecord[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as CaseRecord[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+async function fetchCases(): Promise<CaseRecord[]> {
+  const res = await fetch("/api/cases", { cache: "no-store" });
+  if (!res.ok) return [];
+  const data = (await res.json()) as { ok?: boolean; cases?: CaseRecord[] };
+  return data.ok && Array.isArray(data.cases) ? data.cases : [];
 }
 
-function saveCases(cases: CaseRecord[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(cases));
+export async function getAllCases(): Promise<CaseRecord[]> {
+  return fetchCases();
 }
 
-export function getAllCases(): CaseRecord[] {
-  return loadCases();
+export async function getCase(id: string): Promise<CaseRecord | null> {
+  const res = await fetch(`/api/cases?id=${encodeURIComponent(id)}`, { cache: "no-store" });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { ok?: boolean; case?: CaseRecord | null };
+  return data.ok ? (data.case ?? null) : null;
 }
 
-export function getCase(id: string): CaseRecord | null {
-  return loadCases().find((c) => c.id === id) ?? null;
+export async function getCasesByStatus(status: CaseStatus): Promise<CaseRecord[]> {
+  const cases = await fetchCases();
+  return cases.filter((c) => c.status === status);
 }
 
-export function getCasesByStatus(status: CaseStatus): CaseRecord[] {
-  return loadCases().filter((c) => c.status === status);
-}
-
-export function getCaseCounts(): Record<CaseStatus, number> {
-  const cases = loadCases();
+export async function getCaseCounts(): Promise<Record<CaseStatus, number>> {
+  const cases = await fetchCases();
   const counts = {
     new: 0,
     parts_order: 0,
@@ -48,38 +40,47 @@ export function getCaseCounts(): Record<CaseStatus, number> {
     completed: 0,
     cancelled: 0,
   } as Record<CaseStatus, number>;
-  for (const c of cases) {
-    counts[c.status]++;
-  }
+  for (const c of cases) counts[c.status]++;
   return counts;
 }
 
-export function addCase(record: Omit<CaseRecord, "id" | "createdAt">): CaseRecord {
-  const cases = loadCases();
-  const newRecord: CaseRecord = {
+export async function addCase(record: Omit<CaseRecord, "id" | "createdAt">): Promise<CaseRecord | null> {
+  const now = new Date().toISOString();
+  const draft: CaseRecord = {
     ...record,
     id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
   };
-  cases.push(newRecord);
-  saveCases(cases);
-  return newRecord;
+  const res = await fetch("/api/cases", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ record: draft }),
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { ok?: boolean; case?: CaseRecord };
+  return data.ok ? (data.case ?? null) : null;
 }
 
-export function updateCase(id: string, updates: Partial<Omit<CaseRecord, "id" | "createdAt" | "updatedAt">>): CaseRecord | null {
-  const cases = loadCases();
-  const index = cases.findIndex((c) => c.id === id);
-  if (index === -1) return null;
-  cases[index] = { ...cases[index], ...updates, updatedAt: new Date().toISOString() };
-  saveCases(cases);
-  return cases[index];
+export async function updateCase(
+  id: string,
+  updates: Partial<Omit<CaseRecord, "id" | "createdAt" | "updatedAt">>
+): Promise<CaseRecord | null> {
+  const res = await fetch("/api/cases", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, updates }),
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { ok?: boolean; case?: CaseRecord };
+  return data.ok ? (data.case ?? null) : null;
 }
 
-export function deleteCase(id: string): boolean {
-  const cases = loadCases().filter((c) => c.id !== id);
-  if (cases.length === loadCases().length) return false;
-  saveCases(cases);
-  return true;
+export async function deleteCase(id: string): Promise<boolean> {
+  const res = await fetch(`/api/cases?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) return false;
+  const data = (await res.json()) as { ok?: boolean };
+  return !!data.ok;
 }
 
 /** 登録日から指定日数以上経過しているか */

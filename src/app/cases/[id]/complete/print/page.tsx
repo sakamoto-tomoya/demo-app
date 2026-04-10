@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getCase, updateCase } from "@/lib/store";
 import type { CaseRecord } from "@/lib/types";
 
@@ -86,6 +86,7 @@ export default function CompletePrintPage() {
   const [hidePhotosForFaxPrint, setHidePhotosForFaxPrint] = useState(false);
   const [showEmailPreviewModal, setShowEmailPreviewModal] = useState(false);
   const [emailForReport, setEmailForReport] = useState("");
+  const autoprintDone = useRef(false);
   const typeParam = searchParams.get("type");
   const outputType: OutputType =
     typeParam === "estimate" ? "estimate"
@@ -96,16 +97,41 @@ export default function CompletePrintPage() {
   useEffect(() => {
     setMounted(true);
     if (!id) setRecord(null);
-    else setRecord(getCase(id) ?? null);
+    else void getCase(id).then((c) => setRecord(c ?? null));
   }, [id]);
 
   useEffect(() => {
     if (!mounted || !id || !record) return;
     if (outputType !== "invoice") return;
     if (record.invoiceIssuedAt) return;
-    const updated = updateCase(id, { invoiceIssuedAt: new Date().toISOString() });
-    if (updated) setRecord(updated);
+    void (async () => {
+      const updated = await updateCase(id, { invoiceIssuedAt: new Date().toISOString() });
+      if (updated) setRecord(updated);
+    })();
   }, [mounted, id, record?.id, record?.invoiceIssuedAt, outputType]);
+
+  // 完了報告書表示時に生成状態を更新（report のみ）
+  useEffect(() => {
+    if (!mounted || !id || !record || outputType !== "report") return;
+    const status = record.report_status;
+    if (status === "generated" || status === "downloaded") return;
+    void (async () => {
+      const updated = await updateCase(id, {
+        report_generated_at: new Date().toISOString(),
+        report_status: "generated",
+      });
+      if (updated) setRecord(updated);
+    })();
+  }, [mounted, id, record?.id, outputType]);
+
+  // autoprint=1 のとき表示後に1回だけ印刷ダイアログを開く
+  const autoprint = typeof window !== "undefined" && searchParams.get("autoprint") === "1";
+  useEffect(() => {
+    if (!mounted || !record || !autoprint || autoprintDone.current) return;
+    autoprintDone.current = true;
+    const t = setTimeout(() => window.print(), 500);
+    return () => clearTimeout(t);
+  }, [mounted, record?.id, autoprint]);
 
   const { partsRows, technicalTotal, partsTotal, subtotal, taxRate, taxAmount, totalWithTax } = useMemo(() => {
     if (!record) {
@@ -135,6 +161,19 @@ export default function CompletePrintPage() {
   }, [record]);
 
   const handlePrint = () => {
+    if (outputType === "report" && id) {
+      const onAfterPrint = () => {
+        void (async () => {
+          const updated = await updateCase(id, {
+            report_last_downloaded_at: new Date().toISOString(),
+            report_status: "downloaded",
+          });
+          if (updated) setRecord(updated);
+        })();
+        window.removeEventListener("afterprint", onAfterPrint);
+      };
+      window.addEventListener("afterprint", onAfterPrint);
+    }
     window.print();
   };
 
@@ -183,7 +222,7 @@ export default function CompletePrintPage() {
     setShowEmailPreviewModal(true);
   };
 
-  const handleEmailSend = () => {
+  const handleEmailSend = async () => {
     const to = emailForReport.trim();
     const specifiedNo = (record?.requestSpecifiedNo ?? record?.completionRecipientSpecifiedNo ?? "").trim();
     const subject = specifiedNo
@@ -201,8 +240,9 @@ export default function CompletePrintPage() {
       "署名",
     ].join("\n");
     if (id && to) {
-      updateCase(id, { requestStoreEmail: to });
-      setRecord(getCase(id) ?? record);
+      await updateCase(id, { requestStoreEmail: to });
+      const latest = await getCase(id);
+      setRecord(latest ?? record);
     }
     setShowEmailPreviewModal(false);
     const mailtoUrl = subject
@@ -254,6 +294,13 @@ export default function CompletePrintPage() {
         )}
 
         <div className="no-print mb-6 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="rounded-lg bg-[var(--primary)] px-5 py-2.5 font-medium text-[var(--primary-foreground)] transition hover:opacity-90"
+          >
+            PDFダウンロード
+          </button>
           <button
             type="button"
             onClick={handleFaxPrint}

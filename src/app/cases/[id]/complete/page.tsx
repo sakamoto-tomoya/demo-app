@@ -8,6 +8,7 @@ import { getAllInbound, findVehiclePartByPartNo, normalizePartNo, getRemainingQt
 import { getDefaultOutboundHandlerName } from "@/lib/settings";
 import { CASE_STATUS_LABELS, type CaseRecord } from "@/lib/types";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
+import { AiRepairAssistCard } from "@/components/AiRepairAssistCard";
 
 const cellInputClass =
   "w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm text-[var(--foreground)] min-w-0";
@@ -204,9 +205,10 @@ export default function CompleteCasePage() {
       setRecord(null);
       return;
     }
-    const c = getCase(id);
-    setRecord(c);
-    if (c) {
+    void (async () => {
+      const c = await getCase(id);
+      setRecord(c);
+      if (!c) return;
       setForm({
         completionRecipient: c.requestStoreName ?? c.completionRecipient ?? "",
         completionRecipientPostalCode: c.completionRecipientPostalCode ?? c.requestPostalCode ?? "",
@@ -235,7 +237,7 @@ export default function CompleteCasePage() {
         completionAfterWorkPhotos: c.completionAfterWorkPhotos ?? [],
         completionCustomerSignatureDataUrl: c.completionCustomerSignatureDataUrl ?? "",
       });
-    }
+    })();
   }, [id]);
 
   useEffect(() => {
@@ -270,19 +272,18 @@ export default function CompleteCasePage() {
   const taxAmount = useMemo(() => Math.floor(subtotal * (taxRate / 100)), [subtotal, taxRate]);
   const totalWithTax = useMemo(() => subtotal + taxAmount, [subtotal, taxAmount]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id || !record) return;
-    // ポップアップブロッカー対策: ユーザー操作直後にウィンドウを開き、保存後に遷移する
-    const printWindow =
-      typeof window !== "undefined"
-        ? window.open("about:blank", "_blank", "noopener,noreferrer")
-        : null;
+    if (!id || !record) {
+      alert("案件が読み込まれていません。ページを再読み込みするか、編集画面からやり直してください。");
+      return;
+    }
+    try {
     const outputType: "report" | "estimate" | "invoice" =
       completionInputMode === "default" ? "report"
       : completionInputMode === "simple" ? "estimate"
       : "invoice";
-    updateCase(id, {
+    await updateCase(id, {
       status: "completed",
       completionOutputType: outputType,
       completionRecipient: form.completionRecipient || undefined,
@@ -341,10 +342,9 @@ export default function CompleteCasePage() {
       }
     }
     setSaved(true);
-    if (printWindow && id) {
-      printWindow.location.href = `/cases/${id}/complete/print`;
-    } else if (typeof window !== "undefined" && id) {
-      window.open(`/cases/${id}/complete/print`, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      console.error("完了処理の保存でエラー:", err);
+      alert("保存中にエラーが発生しました。コンソールを確認するか、しばらくして再度お試しください。");
     }
   };
 
@@ -445,29 +445,6 @@ export default function CompleteCasePage() {
 
       <form id="complete-form" onSubmit={handleSubmit} className="space-y-6">
         <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 space-y-4">
-          {/* 発行日・発行No（モードで表示を切り替え） */}
-          {showInMode(completionInputMode, "header") && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <label className="block">
-                <span className="text-sm font-medium text-[var(--foreground)]">
-                  {completionInputMode === "default"
-                    ? "受付番号"
-                    : completionInputMode === "simple"
-                      ? "見積No"
-                      : "請求書発行No"}
-                </span>
-                <input
-                  type="text"
-                  value={record?.receptionNo ?? ""}
-                  readOnly
-                  className={inputClass + " bg-[var(--border)]/30"}
-                />
-              </label>
-            </div>
-          )}
-
-          {showInMode(completionInputMode, "site") && (
-            <>
           <label className="block">
             <span className="text-sm font-medium text-[var(--foreground)]">現場住所</span>
             <input
@@ -488,45 +465,23 @@ export default function CompleteCasePage() {
               placeholder="作業内容を入力"
             />
           </label>
-            </>
-          )}
 
-          {showInMode(completionInputMode, "requestAmount") && (
-          <>
-          {/* ご請求金額 */}
           <div className="flex flex-wrap items-baseline gap-2">
             <span className="text-sm font-medium text-[var(--foreground)]">ご請求金額</span>
             <span className="text-lg font-semibold text-[var(--foreground)]">¥{totalWithTax.toLocaleString()}</span>
             <span className="text-sm text-[var(--muted)]">（税込）</span>
           </div>
-          </>
-          )}
 
-          {showInMode(completionInputMode, "itemsTable") && (
-          <>
-          {/* 品目・数量・単価・合計 テーブル */}
           <div className="overflow-x-auto">
             <table className="w-full min-w-[400px] border-collapse border border-[var(--border)]">
               <thead>
                 <tr className="bg-[var(--border)]/30">
-                  <th className="border border-[var(--border)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)]">
-                    部品名称
-                  </th>
-                  <th className="border border-[var(--border)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)]">
-                    オーダー番号
-                  </th>
-                  <th className="border border-[var(--border)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)]">
-                    部品品番
-                  </th>
-                  <th className="border border-[var(--border)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] w-24">
-                    数量
-                  </th>
-                  <th className="border border-[var(--border)] px-3 py-2 text-right text-sm font-medium text-[var(--foreground)] w-28">
-                    単価
-                  </th>
-                  <th className="border border-[var(--border)] px-3 py-2 text-right text-sm font-medium text-[var(--foreground)] w-28">
-                    合計
-                  </th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)]">部品名称</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)]">オーダー番号</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)]">部品品番</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] w-24">数量</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-right text-sm font-medium text-[var(--foreground)] w-28">単価</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-right text-sm font-medium text-[var(--foreground)] w-28">合計</th>
                 </tr>
               </thead>
               <tbody>
@@ -561,9 +516,7 @@ export default function CompleteCasePage() {
                   </td>
                 </tr>
                 <tr>
-                  <td colSpan={6} className="border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)]">
-                    使用部品
-                  </td>
+                  <td colSpan={6} className="border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)]">使用部品</td>
                 </tr>
                 {form.partsRows.map((row, idx) => {
                   const rowTotal = parseNum(row.qty) * parseNum(row.unitPrice);
@@ -576,9 +529,7 @@ export default function CompleteCasePage() {
                           onChange={(e) =>
                             setForm((p) => ({
                               ...p,
-                              partsRows: p.partsRows.map((r, i) =>
-                                i === idx ? { ...r, partName: e.target.value } : r
-                              ),
+                              partsRows: p.partsRows.map((r, i) => (i === idx ? { ...r, partName: e.target.value } : r)),
                             }))
                           }
                           className={cellInputClass}
@@ -624,9 +575,7 @@ export default function CompleteCasePage() {
                             onChange={(e) => {
                               const partNo = e.target.value;
                               setForm((p) => {
-                                const next = p.partsRows.map((r, i) =>
-                                  i === idx ? { ...r, partNo } : r
-                                );
+                                const next = p.partsRows.map((r, i) => (i === idx ? { ...r, partNo } : r));
                                 const partKey = partNo.trim();
                                 if (partKey) {
                                   const partName = getPartNameByPartNo(partKey);
@@ -704,15 +653,12 @@ export default function CompleteCasePage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
                               setForm((p) => {
                                 const next = p.partsRows.filter((_, i) => i !== idx);
-                                return {
-                                  ...p,
-                                  partsRows: next.length > 0 ? next : [{ partName: "", orderNos: [""], partNo: "", qty: "", unitPrice: "" }],
-                                };
-                              })
-                            }
+                                return { ...p, partsRows: next.length > 0 ? next : [{ partName: "", orderNos: [""], partNo: "", qty: "", unitPrice: "" }] };
+                              });
+                            }}
                             className="shrink-0 rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-xs text-[var(--foreground)] hover:bg-[var(--border)]"
                             title="削除"
                           >
@@ -783,9 +729,7 @@ export default function CompleteCasePage() {
                           onChange={(e) =>
                             setForm((p) => ({
                               ...p,
-                              partsRows: p.partsRows.map((r, i) =>
-                                i === idx ? { ...r, unitPrice: e.target.value } : r
-                              ),
+                              partsRows: p.partsRows.map((r, i) => (i === idx ? { ...r, unitPrice: e.target.value } : r)),
                             }))
                           }
                           className={cellInputClass}
@@ -801,22 +745,13 @@ export default function CompleteCasePage() {
               </tbody>
             </table>
           </div>
-          </>
-          )}
 
-          {showInMode(completionInputMode, "totals") && (
-          <>
-          {/* 小計・消費税・合計 */}
           <div className="flex justify-end">
             <table className="w-full max-w-xs border-collapse">
               <tbody>
                 <tr>
-                  <td className="border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)]">
-                    小計
-                  </td>
-                  <td className="border border-[var(--border)] px-3 py-2 text-right text-[var(--foreground)]">
-                    ¥{subtotal.toLocaleString()}
-                  </td>
+                  <td className="border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)]">小計</td>
+                  <td className="border border-[var(--border)] px-3 py-2 text-right text-[var(--foreground)]">¥{subtotal.toLocaleString()}</td>
                 </tr>
                 <tr>
                   <td className="border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)]">
@@ -834,410 +769,16 @@ export default function CompleteCasePage() {
                     </select>
                     ）
                   </td>
-                  <td className="border border-[var(--border)] px-3 py-2 text-right text-[var(--foreground)]">
-                    ¥{taxAmount.toLocaleString()}
-                  </td>
+                  <td className="border border-[var(--border)] px-3 py-2 text-right text-[var(--foreground)]">¥{taxAmount.toLocaleString()}</td>
                 </tr>
                 <tr className="bg-[var(--border)]/20">
-                  <td className="border border-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]">
-                    合計
-                  </td>
-                  <td className="border border-[var(--border)] px-3 py-2 text-right font-semibold text-[var(--foreground)]">
-                    ¥{totalWithTax.toLocaleString()}
-                  </td>
+                  <td className="border border-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]">合計</td>
+                  <td className="border border-[var(--border)] px-3 py-2 text-right font-semibold text-[var(--foreground)]">¥{totalWithTax.toLocaleString()}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          {form.partsRows.some((r) => (r.partName || "").trim() === "ボタン軸") && (
-            <div className="space-y-4 rounded-lg border border-[var(--border)] bg-[var(--card)]/50 p-4">
-              <label className="block">
-                <span className="text-sm font-medium text-[var(--foreground)]">パーキングを使用しましたか？</span>
-                <div className="mt-2 flex flex-wrap items-center gap-4">
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <input
-                      type="radio"
-                      name="parkingUsed"
-                      checked={form.completionParkingUsed}
-                      onChange={() => setForm((p) => ({ ...p, completionParkingUsed: true }))}
-                      className="h-4 w-4 border-[var(--border)]"
-                    />
-                    <span className="text-sm text-[var(--foreground)]">使用した</span>
-                  </label>
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <input
-                      type="radio"
-                      name="parkingUsed"
-                      checked={!form.completionParkingUsed}
-                      onChange={() => setForm((p) => ({ ...p, completionParkingUsed: false }))}
-                      className="h-4 w-4 border-[var(--border)]"
-                    />
-                    <span className="text-sm text-[var(--foreground)]">していない</span>
-                  </label>
-                </div>
-                {form.completionParkingUsed && (
-                  <div className="mt-3 flex min-w-0 gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      value={form.completionParkingFee ?? ""}
-                      onChange={(e) => setForm((p) => ({ ...p, completionParkingFee: e.target.value }))}
-                      placeholder="パーキング代を入力してください 例:800"
-                      className="block min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
-                    />
-                    <input
-                      ref={parkingReceiptInputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = () =>
-                          setForm((p) => ({ ...p, completionParkingReceiptImageDataUrl: (reader.result as string) ?? "" }));
-                        reader.readAsDataURL(file);
-                        e.target.value = "";
-                      }}
-                      className="sr-only"
-                      aria-hidden
-                    />
-                    <button
-                      type="button"
-                      onClick={() => parkingReceiptInputRef.current?.click()}
-                      className="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--border)]"
-                      title="パーキングレシートを撮影"
-                    >
-                      レシート撮影
-                    </button>
-                  </div>
-                )}
-              </label>
-              {(record?.status === "completed" || record?.status === "estimate") && (
-                <label className="block">
-                  <span className="text-sm font-medium text-[var(--foreground)]">元々の保管場所は？</span>
-                  <select
-                    value={form.completionStoragePlace ?? ""}
-                    onChange={(e) => setForm((p) => ({ ...p, completionStoragePlace: e.target.value }))}
-                    className="mt-1 block w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
-                  >
-                    <option value="">未選択</option>
-                    <option value="事務所">事務所</option>
-                    <option value="研修センター">研修センター</option>
-                    <option value="坂本の車載在庫">坂本の車載在庫</option>
-                    <option value="伊野の車載在庫">伊野の車載在庫</option>
-                    <option value="加藤の車載在庫">加藤の車載在庫</option>
-                  </select>
-                </label>
-              )}
 
-              <div className="space-y-2">
-                <span className="text-sm font-medium text-[var(--foreground)]">ガス漏れチェック画像</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  {form.completionGasLeakCheckImageDataUrl && (
-                    <img
-                      src={form.completionGasLeakCheckImageDataUrl}
-                      alt="ガス漏れチェック"
-                      className="h-20 w-20 rounded border border-[var(--border)] object-cover"
-                    />
-                  )}
-                  <input
-                    ref={gasLeakInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () =>
-                        setForm((p) => ({ ...p, completionGasLeakCheckImageDataUrl: (reader.result as string) ?? "" }));
-                      reader.readAsDataURL(file);
-                      e.target.value = "";
-                    }}
-                    className="sr-only"
-                    aria-hidden
-                  />
-                  <button
-                    type="button"
-                    onClick={() => gasLeakInputRef.current?.click()}
-                    className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--border)]"
-                  >
-                    ボタン押して撮影（スマホ・PC兼用）
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <span className="text-sm font-medium text-[var(--foreground)]">作業前写真を3枚</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  {(form.completionBeforeWorkPhotos ?? []).map((url, i) => (
-                    <div key={i} className="relative">
-                      <img src={url} alt={`作業前${i + 1}`} className="h-20 w-20 rounded border border-[var(--border)] object-cover" />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setForm((p) => ({
-                            ...p,
-                            completionBeforeWorkPhotos: (p.completionBeforeWorkPhotos ?? []).filter((_, j) => j !== i),
-                          }))
-                        }
-                        className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card)] text-xs hover:bg-red-50 hover:text-red-600"
-                        aria-label="削除"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  {(form.completionBeforeWorkPhotos ?? []).length < 3 && (
-                    <>
-                      <input
-                        ref={beforeWorkInputRef}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = () => {
-                            const url = reader.result as string;
-                            setForm((p) => ({
-                              ...p,
-                              completionBeforeWorkPhotos: [...(p.completionBeforeWorkPhotos ?? []), url].slice(0, 3),
-                            }));
-                          };
-                          reader.readAsDataURL(file);
-                          e.target.value = "";
-                        }}
-                        className="sr-only"
-                        aria-hidden
-                      />
-                      <button
-                        type="button"
-                        onClick={() => beforeWorkInputRef.current?.click()}
-                        className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--border)]"
-                      >
-                        ボタン押して撮影（スマホ・PC兼用）
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <span className="text-sm font-medium text-[var(--foreground)]">作業中写真を3枚</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  {(form.completionDuringWorkPhotos ?? []).map((url, i) => (
-                    <div key={i} className="relative">
-                      <img src={url} alt={`作業中${i + 1}`} className="h-20 w-20 rounded border border-[var(--border)] object-cover" />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setForm((p) => ({
-                            ...p,
-                            completionDuringWorkPhotos: (p.completionDuringWorkPhotos ?? []).filter((_, j) => j !== i),
-                          }))
-                        }
-                        className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card)] text-xs hover:bg-red-50 hover:text-red-600"
-                        aria-label="削除"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  {(form.completionDuringWorkPhotos ?? []).length < 3 && (
-                    <>
-                      <input
-                        ref={duringWorkInputRef}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = () => {
-                            const url = reader.result as string;
-                            setForm((p) => ({
-                              ...p,
-                              completionDuringWorkPhotos: [...(p.completionDuringWorkPhotos ?? []), url].slice(0, 3),
-                            }));
-                          };
-                          reader.readAsDataURL(file);
-                          e.target.value = "";
-                        }}
-                        className="sr-only"
-                        aria-hidden
-                      />
-                      <button
-                        type="button"
-                        onClick={() => duringWorkInputRef.current?.click()}
-                        className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--border)]"
-                      >
-                        ボタン押して撮影（スマホ・PC兼用）
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <span className="text-sm font-medium text-[var(--foreground)]">作業後写真を3枚</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  {(form.completionAfterWorkPhotos ?? []).map((url, i) => (
-                    <div key={i} className="relative">
-                      <img src={url} alt={`作業後${i + 1}`} className="h-20 w-20 rounded border border-[var(--border)] object-cover" />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setForm((p) => ({
-                            ...p,
-                            completionAfterWorkPhotos: (p.completionAfterWorkPhotos ?? []).filter((_, j) => j !== i),
-                          }))
-                        }
-                        className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card)] text-xs hover:bg-red-50 hover:text-red-600"
-                        aria-label="削除"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  {(form.completionAfterWorkPhotos ?? []).length < 3 && (
-                    <>
-                      <input
-                        ref={afterWorkInputRef}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = () => {
-                            const url = reader.result as string;
-                            setForm((p) => ({
-                              ...p,
-                              completionAfterWorkPhotos: [...(p.completionAfterWorkPhotos ?? []), url].slice(0, 3),
-                            }));
-                          };
-                          reader.readAsDataURL(file);
-                          e.target.value = "";
-                        }}
-                        className="sr-only"
-                        aria-hidden
-                      />
-                      <button
-                        type="button"
-                        onClick={() => afterWorkInputRef.current?.click()}
-                        className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--border)]"
-                      >
-                        ボタン押して撮影（スマホ・PC兼用）
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <span className="text-sm font-medium text-[var(--foreground)]">お客様サイン欄（スマホで指で書きやすく）</span>
-                <div className="flex flex-col gap-2">
-                  <canvas
-                    ref={signatureCanvasRef}
-                    width={320}
-                    height={120}
-                    className="touch-none rounded-lg border-2 border-[var(--border)] bg-white cursor-crosshair"
-                    style={{ touchAction: "none" }}
-                    onMouseDown={(e) => {
-                      const canvas = signatureCanvasRef.current;
-                      if (!canvas) return;
-                      const ctx = canvas.getContext("2d");
-                      if (!ctx) return;
-                      ctx.strokeStyle = "#000";
-                      ctx.lineWidth = 2;
-                      ctx.lineCap = "round";
-                      const rect = canvas.getBoundingClientRect();
-                      const scaleX = canvas.width / rect.width;
-                      const scaleY = canvas.height / rect.height;
-                      ctx.beginPath();
-                      ctx.moveTo((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
-                      const draw = (e2: MouseEvent) => {
-                        ctx.lineTo((e2.clientX - rect.left) * scaleX, (e2.clientY - rect.top) * scaleY);
-                        ctx.stroke();
-                      };
-                      const stop = () => {
-                        window.removeEventListener("mousemove", draw);
-                        window.removeEventListener("mouseup", stop);
-                        setForm((p) => ({ ...p, completionCustomerSignatureDataUrl: canvas.toDataURL("image/png") }));
-                      };
-                      window.addEventListener("mousemove", draw);
-                      window.addEventListener("mouseup", stop);
-                    }}
-                    onTouchStart={(e) => {
-                      e.preventDefault();
-                      const canvas = signatureCanvasRef.current;
-                      if (!canvas) return;
-                      const ctx = canvas.getContext("2d");
-                      if (!ctx) return;
-                      ctx.strokeStyle = "#000";
-                      ctx.lineWidth = 2;
-                      ctx.lineCap = "round";
-                      const touch = e.touches[0];
-                      const rect = canvas.getBoundingClientRect();
-                      const scaleX = canvas.width / rect.width;
-                      const scaleY = canvas.height / rect.height;
-                      ctx.beginPath();
-                      ctx.moveTo((touch.clientX - rect.left) * scaleX, (touch.clientY - rect.top) * scaleY);
-                      const draw = (e2: Event) => {
-                        const te = e2 as TouchEvent;
-                        if (!te.touches[0]) return;
-                        const t = te.touches[0];
-                        ctx.lineTo((t.clientX - rect.left) * scaleX, (t.clientY - rect.top) * scaleY);
-                        ctx.stroke();
-                      };
-                      const stop = () => {
-                        window.removeEventListener("touchmove", draw);
-                        window.removeEventListener("touchend", stop);
-                        setForm((p) => ({ ...p, completionCustomerSignatureDataUrl: canvas.toDataURL("image/png") }));
-                      };
-                      window.addEventListener("touchmove", draw, { passive: false });
-                      window.addEventListener("touchend", stop);
-                    }}
-                    onTouchMove={(e) => e.preventDefault()}
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const canvas = signatureCanvasRef.current;
-                        if (canvas) {
-                          const ctx = canvas.getContext("2d");
-                          if (ctx) {
-                            ctx.clearRect(0, 0, canvas.width, canvas.height);
-                            setForm((p) => ({ ...p, completionCustomerSignatureDataUrl: "" }));
-                          }
-                        }
-                      }}
-                      className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-sm text-[var(--foreground)] hover:bg-[var(--border)]"
-                    >
-                      クリア
-                    </button>
-                    {form.completionCustomerSignatureDataUrl && (
-                      <img
-                        src={form.completionCustomerSignatureDataUrl}
-                        alt="サイン"
-                        className="h-12 rounded border border-[var(--border)]"
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          </>
-          )}
-
-          {showInMode(completionInputMode, "remarks") && (
           <label className="block">
             <span className="text-sm font-medium text-[var(--foreground)]">備考</span>
             <textarea
@@ -1248,8 +789,14 @@ export default function CompleteCasePage() {
               placeholder="備考を入力"
             />
           </label>
-          )}
         </div>
+
+        <AiRepairAssistCard
+          modelName={record.modelName ?? ""}
+          symptom={record.inquiryContent ?? ""}
+          status={record.status}
+          instanceKey={id}
+        />
 
         <div className="flex flex-wrap gap-3">
           <button

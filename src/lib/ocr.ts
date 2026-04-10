@@ -13,7 +13,16 @@ if (typeof window !== "undefined") {
 }
 
 import { parseOcrText, type OcrResult } from "./ocr-parse";
+import type { OcrFieldMapping } from "./ocr-types";
 export type { OcrResult } from "./ocr-parse";
+export type { OcrFieldMapping } from "./ocr-types";
+
+/** OCR 実行結果。Mock の場合は mapping で信頼度・座標を表示できる */
+export type RunPdfOcrResult = {
+  parsed: OcrResult;
+  mock?: boolean;
+  mapping?: OcrFieldMapping;
+};
 
 /** PDFの1ページ目から埋め込みテキストを抽出（テキスト付きPDF用） */
 async function getTextFromPdfPage(file: File): Promise<string> {
@@ -80,30 +89,89 @@ async function pdfFirstPageToImageDataUrl(file: File): Promise<string> {
   return canvas.toDataURL("image/png");
 }
 
-/** PDFファイルからテキストを取得して転記用オブジェクトを返す（Google Document AI 優先 → 埋め込みテキスト → OCR） */
-export async function runPdfOcr(file: File): Promise<OcrResult> {
-  // 1. Google Document AI を優先利用
+/** クラウド OCR API 呼び出しのタイムアウト（ミリ秒） */
+const OCR_API_TIMEOUT_MS = 95_000;
+
+const LOG_PREFIX = "[runPdfOcr]";
+
+export type RunPdfOcrOptions = {
+  /** フォールバック（埋め込みテキスト/Tesseract）に移る直前に呼ばれる（UIの段階表示用） */
+  onFallback?: () => void;
+};
+
+/** PDFファイルからテキストを取得して転記用オブジェクトを返す（Azure Document Intelligence 成功時はAPI、失敗時は実PDFの埋め込みテキスト/Tesseract にフォールバック） */
+export async function runPdfOcr(file: File, options?: RunPdfOcrOptions): Promise<RunPdfOcrResult> {
+  const totalStart = Date.now();
+  const onFallback = options?.onFallback;
+
+  // 1. API 呼び出し（Azure Document Intelligence）。失敗・未設定・タイムアウト時は下の実PDF解析にフォールバック
   try {
+    console.log(`${LOG_PREFIX} Azure OCR 開始`);
+    const apiStart = Date.now();
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch("/api/ocr-google", { method: "POST", body: formData });
-    const data = (await res.json()) as { success: boolean; parsed?: OcrResult; error?: string };
-    if (data.success && data.parsed) return data.parsed;
-  } catch {
-    // ネットワークエラー等はローカル処理にフォールバック
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), OCR_API_TIMEOUT_MS);
+    const res = await fetch("/api/ocr", {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    const data = (await res.json()) as {
+      success: boolean;
+      parsed?: OcrResult;
+      error?: string;
+      mock?: boolean;
+      mapping?: OcrFieldMapping;
+    };
+    const apiMs = Date.now() - apiStart;
+    if (data.success && data.parsed) {
+      console.log(`${LOG_PREFIX} Azure OCR 終了 成功 ${apiMs}ms`);
+      return {
+        parsed: data.parsed,
+        mock: data.mock ?? false,
+        mapping: data.mapping,
+      };
+    }
+    console.log(`${LOG_PREFIX} Azure OCR 失敗/未設定 ${apiMs}ms、フォールバックへ`);
+  } catch (err) {
+    const apiMs = Date.now() - totalStart;
+    console.log(`${LOG_PREFIX} Azure OCR 例外 ${apiMs}ms:`, err instanceof Error ? err.message : String(err));
   }
 
-  // 2. PDFの埋め込みテキストを取得（テキスト付きPDFなら正確で高速）
+  // 2. 埋め込みテキスト（テキスト付きPDF用）または Tesseract（画像PDF用）— 常に選択したPDFの実データ
+  onFallback?.();
+  console.log(`${LOG_PREFIX} フォールバック（埋め込みテキスト/Tesseract）開始`);
+  const fallbackStart = Date.now();
   let text = await getTextFromPdfPage(file);
   const minEmbeddedLength = 150;
 
   if (text.length < minEmbeddedLength) {
-    // 3. スキャンPDFなどは Tesseract OCR
     const dataUrl = await pdfFirstPageToImageDataUrl(file);
     const Tesseract = (await import("tesseract.js")).default;
     const { data } = await Tesseract.recognize(dataUrl, "jpn+eng", { logger: () => {} });
     text = data.text;
   }
 
-  return parseOcrText(text);
+  const parsed = parseOcrText(text);
+  const mapping = buildMappingFromParsed(parsed);
+  const fallbackMs = Date.now() - fallbackStart;
+  const totalMs = Date.now() - totalStart;
+  console.log(`${LOG_PREFIX} フォールバック 終了 ${fallbackMs}ms (合計 ${totalMs}ms)`);
+  return { parsed, mapping };
+}
+
+/** クライアント側解析結果から抽出結果パネル用の mapping を組み立て（信頼度・座標はダミー） */
+function buildMappingFromParsed(parsed: OcrResult): OcrFieldMapping {
+  const entries = Object.entries(parsed).filter(
+    ([, v]) => v != null && String(v).trim() !== ""
+  );
+  const dummyBbox = { page: 1, x: 0, y: 0, w: 0, h: 0 };
+  return Object.fromEntries(
+    entries.map(([k, v]) => [
+      k,
+      { value: String(v), confidence: 1, bbox: dummyBbox },
+    ])
+  ) as OcrFieldMapping;
 }

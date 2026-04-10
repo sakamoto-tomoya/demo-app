@@ -65,6 +65,86 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ---
 
+## ローカルでの Document AI（高精度OCR）
+
+書類PDFのOCRは **Google Document AI** を利用します。ローカル（`npm run dev`）でも同じAPIが使われ、未設定・認証エラー時は Tesseract にフォールバックせずエラーを表示します。
+
+### ローカルで Document AI を使う手順
+
+1. **Google Cloud で Document AI を有効化**
+   - [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作成または選択
+   - **API とサービス** → **ライブラリ** で「Cloud Document AI API」を有効化
+   - **Document AI** でプロセッサを作成（フォーム・ドキュメント用など）。リージョン（例: `us`）とプロセッサ ID を控える
+
+2. **サービスアカウント鍵**
+   - **IAM と管理** → **サービスアカウント** でキーを作成し、JSON 鍵をダウンロード
+   - プロジェクトルートに配置（例: `pdf-run-xxxx.json`）。`.gitignore` で除外されていることを確認
+
+3. **`.env.local` に設定**
+   ```env
+   GOOGLE_APPLICATION_CREDENTIALS=./pdf-run-xxxx.json
+   GOOGLE_CLOUD_PROJECT_ID=あなたのプロジェクトID
+   DOCUMENT_AI_LOCATION=us
+   DOCUMENT_AI_PROCESSOR_ID=プロセッサID
+   ```
+   - 相対パス（`./pdf-run-xxxx.json`）のときは、**プロジェクトのルート**（`gyoumukannri` フォルダ）に鍵JSONを置いてください。
+   - **Windows で「ファイルが存在しない」になる場合**は、絶対パスを指定してください。例:  
+     `GOOGLE_APPLICATION_CREDENTIALS=C:/Users/あなたのユーザー名/Downloads/pdf-run-xxxx.json`  
+     （スラッシュで書くと Windows でもそのまま使えます。）
+
+4. 開発サーバーを再起動（`npm run dev`）。案件登録で PDF をアップロードすると Document AI でOCRされます。
+
+※ 未設定のまま PDF をアップロードすると、**Mock モード**に自動切り替わり、事前保存済みのサンプル抽出結果が返ります（下記「Document AI Mock モード」参照）。
+
+### Document AI Mock モード（ポートフォリオ・Billing なしで動作）
+
+- **DOCUMENT_AI_USE_MOCK=true** を `.env.local` に追加すると、常に Mock が使われます（環境変数・Billing 不要）。
+- 未設定のままでも、環境変数不足や Document AI のエラー時は **自動で Mock に切り替わります**。
+- Mock 用データ: `data/ocr-mock/sample.documentai.json` と `sample.mapping.json` を配置してください（リポジトリに同梱済み）。
+- 画面上で **PDF プレビュー・抽出項目一覧・信頼度・座標（バウンディングボックス）・要確認項目の色分け** が表示されます。
+- サンプル PDF を表示したい場合は、任意の PDF を **public/sample.pdf** としてコピーしてください。
+
+---
+
+## OCR 学習データの蓄積と Azure Document Intelligence Studio での再トレーニング
+
+受付新規登録で OCR したあとに手動で修正した内容を保存し、蓄積したデータを Azure Document Intelligence Studio に取り込んで再トレーニングする運用で、OCR 精度を継続的に改善できます。
+
+### 1. 手修正内容の保存（この内容で保存）
+
+- 受付新規登録画面で PDF をアップロードして OCR を実行したあと、フォームの各項目を必要に応じて手動で修正します。
+- **「この内容で保存」** ボタンを押すと、現在のフォームの値（修正後）と、OCR に使用した PDF のファイル名が DB の `ocr_training_data` テーブルに保存されます。
+- 手修正のたびにこの操作を行うことで、「正解ラベル付き」の学習データが蓄積されていきます。
+
+### 2. CSV エクスポート（Studio インポート用）
+
+- 画面上の **「CSVエクスポート」** ボタンを押すと、蓄積した学習データが CSV 形式でダウンロードされます。
+- CSV の列は Azure Document Intelligence Studio で利用するフィールド名（修理受付番号・ご依頼店名・お客様名・型式名・問合/依頼内容 など）に合わせており、Studio にインポートしてラベル付けや再トレーニングに利用できる形式です。
+- 文字コードは UTF-8（BOM 付き）です。
+
+### 3. 定期的な再トレーニング運用フロー
+
+1. **日常運用**  
+   受付時に OCR で自動転記し、誤りがあれば手修正して **「この内容で保存」** で学習データとして保存する。
+2. **データの蓄積**  
+   一定件数（例: 50 件〜100 件）たまったら、画面上の **「CSVエクスポート」** で CSV をダウンロードする。
+3. **Studio への取り込み**  
+   - [Azure Document Intelligence Studio](https://documentintelligence.azure.com/) を開き、使用しているカスタムモデル（例: `paloma-repair-model`）のプロジェクトを選択する。
+   - エクスポートした CSV を参考に、対応する PDF と正解ラベルを Studio にアップロードする（Studio のインポート手順に従う）。
+4. **ラベル付け・再トレーニング**  
+   - 必要に応じて Studio 上でラベルを調整し、モデルの再トレーニングを実行する。
+   - 学習が完了したら、新しいモデルバージョンをデプロイし、本アプリの OCR で利用する。
+5. **繰り返し**  
+   上記を定期的（例: 月 1 回）に実施することで、手修正のたびに精度向上に使えるデータが蓄積され、OCR 精度が段階的に向上します。
+
+### 技術メモ
+
+- 学習データは Turso（`ocr_training_data` テーブル）に保存されます。初回は `npm run db:init` または `/api/debug/init-db` でテーブルを作成してください。
+- 保存 API: `POST /api/ocr-training-data`（JSON で `pdf_file_name` と各フィールドを送信）。
+- エクスポート API: `GET /api/ocr-training-data/export`（CSV を返却）。
+
+---
+
 ## 共通パスワード（アクセス保護）
 
 公開 URL にアクセスした人が、共通パスワードを入力しないとアプリを見られないようにする機能です。
@@ -145,3 +225,72 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
   - [ ] デモ用に `NEXT_PUBLIC_SALESFORCE_URL` / `NEXT_PUBLIC_PARTS_ORDER_URL` をデモ用または空にしている
 - [ ] **ドキュメント**
   - [ ] README の「公開デモ時の注意点」「最終公開チェックリスト」を一読した
+
+---
+
+## ローカル起動手順（ポートフォリオ・Mock 用）
+
+Document AI の Billing や鍵なしで OCR 画面を動かす場合の手順です。
+
+1. **リポジトリをクローンし、依存関係を入れる**
+   ```bash
+   cd gyoumukannri
+   npm install
+   ```
+
+2. **Mock モードを有効にする（任意）**
+   - `.env.local` に次の1行を追加する:
+     ```env
+     DOCUMENT_AI_USE_MOCK=true
+     ```
+   - 追加しない場合も、Document AI の環境変数が未設定なら **自動で Mock** になります。
+
+3. **開発サーバーを起動する**
+   ```bash
+   npm run dev
+   ```
+
+4. **ブラウザで開く**
+   - [http://localhost:3000](http://localhost:3000) を開く。
+   - アクセス保護がかかっている場合は、設定したパスワードでログインする。
+
+5. **OCR を試す**
+   - **案件管理**（新規案件）を開く。
+   - 「PDFで自動転記」の **ファイル選択** で、任意の PDF を1枚選ぶ。
+   - Mock のときは、どの PDF でも **同じサンプル抽出結果** がフォームに反映され、その下に **OCR 抽出結果**（項目一覧・信頼度・座標）が表示される。
+
+6. **サンプル PDF のプレビューを出す（任意）**
+   - 任意の PDF を **public/sample.pdf** という名前でコピーする。
+   - 同じ画面で OCR 実行後、「PDF プレビュー」欄にその PDF が表示される。
+
+本番で Document AI を使う場合は、上記「ローカルでの Document AI」のとおり環境変数と鍵を設定し、`DOCUMENT_AI_USE_MOCK` は削除または `false` にしてください。
+
+---
+
+## Dify ナレッジベース（案件保存時の自動登録）
+
+`/api/cases` で案件を保存したあと、Dify Knowledge API で **1 件 1 ドキュメント** としてテキスト登録します。登録に失敗しても **案件保存は成功** のままです。
+
+- **受付ナレッジ**（`DIFY_KNOWLEDGE_DATASET_ID`）: 案件保存のたびに登録（受付番号・依頼元店名・電話・お客様名・住所・電話・型式・症状・問合内容）
+- **修理履歴ナレッジ**（`DIFY_REPAIR_HISTORY_DATASET_ID`）: ステータスが **完了** の保存時のみ登録（上記に加え修理内容・使用部品・完了日）
+
+`.env.local` の例:
+
+```env
+# ナレッジ用 Dataset API キー
+DIFY_KNOWLEDGE_API_KEY=your-api-key
+# 受付ナレッジ用データセット ID（必ず UUID。APIキー dataset-... とは別）
+DIFY_KNOWLEDGE_DATASET_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+# 修理履歴ナレッジ用データセット ID
+DIFY_REPAIR_HISTORY_DATASET_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+- 呼び出し: `POST https://api.dify.ai/v1/datasets/{dataset_id}/document/create_by_text`（`Authorization: Bearer`、`Content-Type: application/json`）
+- ドキュメント名例: `受付番号_XXXXXXXX`
+- ターミナルログ例: `[dify-knowledge] 受付ナレッジ登録成功: 受付番号XXXXXXXX` / `[dify-knowledge] 修理履歴ナレッジ登録成功: 受付番号XXXXXXXX`（失敗時は `登録失敗`、未設定時は `スキップ`）
+
+### Dify ワークフロー（案件保存後の `runDifyWorkflow` / 受付チェック）
+
+- **`/v1/workflows/run` にはワークフローアプリの API キーを使う**（チャットボット用 `DIFY_APP_API_KEY` だけを渡すと 400 になりやすい）。
+- 受付チェック（`/api/dify/reception-check`）: `DIFY_RECEPTION_CHECK_API_KEY` ＋ `DIFY_RECEPTION_CHECK_URL`（省略時は `https://api.dify.ai/v1/workflows/run`）
+- 案件保存後ワークフロー: 優先 **`DIFY_CASE_WORKFLOW_API_KEY`** / `DIFY_CASE_WORKFLOW_URL`、なければ `DIFY_WORKFLOW_*`、`DIFY_RECEPTION_CHECK_*`、`DIFY_API_KEY`

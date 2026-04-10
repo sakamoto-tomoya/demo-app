@@ -1,0 +1,25 @@
+{
+  "id": "template_with_requester",
+  "name": "パロマ 出張修理依頼書（依頼元情報あり）",
+  "formType": "repair_request",
+  "fields": [
+    { "field_key": "receptionNo", "label": "修理受付番号", "page": 1, "x": 0.05, "y": 0.02, "width": 0.25, "height": 0.03, "field_type": "reception_no", "required": true, "confidence_rule": "strict" },
+    { "field_key": "customerName", "label": "お客様名", "page": 1, "x": 0.08, "y": 0.22, "width": 0.35, "height": 0.04, "field_type": "customer_name", "confidence_rule": "normal" },
+    { "field_key": "customerFurigana", "label": "フリガナ（お客様）", "page": 1, "x": 0.08, "y": 0.27, "width": 0.35, "height": 0.03, "field_type": "customer_furigana", "confidence_rule": "normal" },
+    { "field_key": "postalCode", "label": "郵便番号", "page": 1, "x": 0.08, "y": 0.31, "width": 0.2, "height": 0.03, "field_type": "postal_code", "confidence_rule": "strict" },
+    { "field_key": "address", "label": "住所", "page": 1, "x": 0.08, "y": 0.35, "width": 0.75, "height": 0.12, "field_type": "address", "confidence_rule": "lenient" },
+    { "field_key": "phone", "label": "自宅電話", "page": 1, "x": 0.08, "y": 0.48, "width": 0.25, "height": 0.03, "field_type": "phone", "confidence_rule": "strict" },
+    { "field_key": "mobile", "label": "携帯番号", "page": 1, "x": 0.4, "y": 0.48, "width": 0.25, "height": 0.03, "field_type": "phone", "confidence_rule": "strict" },
+    { "field_key": "modelName", "label": "型式名", "page": 1, "x": 0.08, "y": 0.54, "width": 0.3, "height": 0.035, "field_type": "model", "confidence_rule": "strict" },
+    { "field_key": "reportedModelName", "label": "お申し出型式名", "page": 1, "x": 0.45, "y": 0.54, "width": 0.25, "height": 0.035, "field_type": "model", "confidence_rule": "strict" },
+    { "field_key": "gasType", "label": "ガス種", "page": 1, "x": 0.75, "y": 0.54, "width": 0.15, "height": 0.035, "field_type": "gas_type", "confidence_rule": "strict" },
+    { "field_key": "inquiryContent", "label": "問合/依頼内容", "page": 1, "x": 0.05, "y": 0.60, "width": 0.88, "height": 0.28, "field_type": "inquiry", "confidence_rule": "lenient" },
+    { "field_key": "requestStoreName", "label": "ご依頼店名", "page": 1, "x": 0.5, "y": 0.05, "width": 0.35, "height": 0.04, "field_type": "request_store", "confidence_rule": "normal" },
+    { "field_key": "requestPhone", "label": "電話番号（依頼店）", "page": 1, "x": 0.5, "y": 0.12, "width": 0.2, "height": 0.03, "field_type": "phone", "confidence_rule": "strict" },
+    { "field_key": "requestFax", "label": "FAX（依頼店）", "page": 1, "x": 0.72, "y": 0.12, "width": 0.2, "height": 0.03, "field_type": "phone", "confidence_rule": "strict" },
+    { "field_key": "requestAddress", "label": "依頼元住所", "page": 1, "x": 0.5, "y": 0.16, "width": 0.45, "height": 0.08, "field_type": "address", "confidence_rule": "lenient" },
+    { "field_key": "receptionDate", "label": "受付日", "page": 1, "x": 0.05, "y": 0.10, "width": 0.15, "height": 0.03, "field_type": "preferred_date", "confidence_rule": "normal" },
+    { "field_key": "desiredVisitDate", "label": "訪問希望日", "page": 1, "x": 0.22, "y": 0.10, "width": 0.12, "height": 0.03, "field_type": "preferred_date", "confidence_rule": "normal" },
+    { "field_key": "desiredVisitTime", "label": "訪問希望時間", "page": 1, "x": 0.36, "y": 0.10, "width": 0.18, "height": 0.03, "field_type": "preferred_time", "confidence_rule": "normal" }
+  ]
+}

@@ -4,14 +4,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import {
-  getVehiclePartsMergedByPartNo,
+  getAllInbound,
+  getAllOutbound,
   getVehiclePartsByPartNo,
   deleteVehiclePartByPartNo,
+  deleteInbound,
+  deleteOutbound,
   getInboundByPartNo,
   getOutboundByPartNo,
   getOrderRemainingRaw,
-  type VehiclePartRecord,
+  normalizePartNo,
+  findPartsMasterByPartNo,
 } from "@/lib/parts-store";
+import { formatYen } from "@/lib/price-utils";
+
+/** 在庫検索用：部品品番ごとの 入庫数−出庫数。単価は部品マスタから参照 */
+type StockRow = { partNo: string; partName: string; quantity: number; partCost?: number };
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 
 const PARTS_ORDER_URL = process.env.NEXT_PUBLIC_PARTS_ORDER_URL ?? "";
@@ -19,23 +27,52 @@ const PARTS_ORDER_URL = process.env.NEXT_PUBLIC_PARTS_ORDER_URL ?? "";
 export default function PartsStockSearchPage() {
   const pathname = usePathname();
   const [query, setQuery] = useState("");
-  const [list, setList] = useState<VehiclePartRecord[]>([]);
+  const [list, setList] = useState<StockRow[]>([]);
   const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
   const [expandedPartNo, setExpandedPartNo] = useState<string | null>(null);
 
+  /** 入庫数−出庫数＝在庫検索の部品数 */
   const refreshList = () => {
-    const merged = getVehiclePartsMergedByPartNo();
+    const inList = getAllInbound();
+    const outList = getAllOutbound();
+    const byPartNo = new Map<string, { partNo: string; partName: string; inboundTotal: number; outboundTotal: number }>();
+    for (const r of inList) {
+      const key = normalizePartNo(r.partNo ?? "");
+      if (!key) continue;
+      if (!byPartNo.has(key)) {
+        byPartNo.set(key, { partNo: r.partNo ?? "", partName: r.partName ?? "", inboundTotal: 0, outboundTotal: 0 });
+      }
+      byPartNo.get(key)!.inboundTotal += Number(r.inboundQty) || 0;
+    }
+    for (const r of outList) {
+      const key = normalizePartNo(r.partNo ?? "");
+      if (!key) continue;
+      if (!byPartNo.has(key)) {
+        byPartNo.set(key, { partNo: r.partNo ?? "", partName: r.partName ?? "", inboundTotal: 0, outboundTotal: 0 });
+      }
+      byPartNo.get(key)!.outboundTotal += Number(r.outboundQty) || 0;
+    }
+    const rows: StockRow[] = Array.from(byPartNo.entries()).map(([, v]) => {
+      const master = findPartsMasterByPartNo(v.partNo);
+      return {
+        partNo: v.partNo,
+        partName: v.partName,
+        quantity: v.inboundTotal - v.outboundTotal,
+        partCost: master?.partCost,
+      };
+    });
+    const sorted = rows.sort((a, b) => (a.partNo ?? "").localeCompare(b.partNo ?? ""));
     if (!query.trim()) {
-      setList(merged);
+      setList(sorted);
       return;
     }
     const q = query.trim().toLowerCase();
     setList(
-      merged.filter(
+      sorted.filter(
         (r) =>
           (r.partNo ?? "").toLowerCase().includes(q) ||
           (r.partName ?? "").toLowerCase().includes(q) ||
-          (r.storagePlaceVehicle ?? "").toLowerCase().includes(q)
+          getVehiclePartsByPartNo(r.partNo).some((vp) => (vp.storagePlaceVehicle ?? "").toLowerCase().includes(q))
       )
     );
   };
@@ -49,19 +86,36 @@ export default function PartsStockSearchPage() {
       if (typeof document !== "undefined" && document.visibilityState === "visible") refreshList();
     };
     const onFocus = () => refreshList();
+    /** 別タブで localStorage が変わったとき */
+    const onStorage = (e: StorageEvent) => {
+      if (e.key?.startsWith("gyoumukannri_parts")) refreshList();
+    };
+    /** 同一タブ内で parts-store が保存したとき（storage イベントは同一タブでは発火しない） */
+    const onPartsCustom = () => refreshList();
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("gyoumukannri-parts-storage", onPartsCustom);
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("gyoumukannri-parts-storage", onPartsCustom);
     };
   }, [query, pathname]);
 
   const handleDelete = (partNo: string) => {
-    if (confirm("この部品を削除しますか？")) {
-      deleteVehiclePartByPartNo(partNo);
-      refreshList();
+    if (
+      !confirm(
+        "この部品の入庫・出庫履歴をすべて削除しますか？在庫一覧からも消えます。"
+      )
+    ) {
+      return;
     }
+    getInboundByPartNo(partNo).forEach((r) => deleteInbound(r.id));
+    getOutboundByPartNo(partNo).forEach((r) => deleteOutbound(r.id));
+    deleteVehiclePartByPartNo(partNo);
+    refreshList();
   };
 
   return (
@@ -105,7 +159,7 @@ export default function PartsStockSearchPage() {
           <thead>
             <tr className="bg-[var(--border)]/30">
               <th className="border-b border-[var(--border)] px-3 py-2 text-left w-12"></th>
-              <th className="border-b border-[var(--border)] px-3 py-2 text-left">部品品番</th>
+              <th className="border-b border-[var(--border)] px-3 py-2 text-left">部品品番・価格</th>
               <th className="border-b border-[var(--border)] px-3 py-2 text-left">部品名称</th>
               <th className="border-b border-[var(--border)] px-3 py-2 text-right">部品数</th>
               <th className="border-b border-[var(--border)] px-3 py-2 text-left w-16">削除</th>
@@ -135,7 +189,7 @@ export default function PartsStockSearchPage() {
                   .filter(Boolean) as string[];
                 const uniqueStorageDisplay = storageDisplay.length > 0 ? storageDisplay.join("、") : "—";
                 return (
-                  <React.Fragment key={r.id ?? partNo}>
+                  <React.Fragment key={partNo}>
                     <tr className="border-b border-[var(--border)]">
                       <td className="px-2 py-1">
                         <button
@@ -147,9 +201,12 @@ export default function PartsStockSearchPage() {
                           {isExpanded ? "－" : "詳細"}
                         </button>
                       </td>
-                      <td className="px-3 py-2">{r.partNo}</td>
+                      <td className="px-3 py-2">
+                        <div>{r.partNo}</div>
+                        <div className="text-[var(--muted)] text-[11px]">価格: {formatYen(r.partCost)}</div>
+                      </td>
                       <td className="px-3 py-2">{r.partName ?? ""}</td>
-                      <td className="px-3 py-2 text-right">{r.quantity ?? "—"}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{r.quantity}</td>
                       <td className="px-3 py-2">
                         <button
                           type="button"
@@ -240,7 +297,7 @@ export default function PartsStockSearchPage() {
                             </div>
                             <div>
                               <p className="font-medium text-[var(--foreground)]">
-                                現在残り: <span className="font-semibold tabular-nums">{r.quantity ?? 0}</span> 個
+                                現在残り（入庫−出庫）: <span className="font-semibold tabular-nums">{r.quantity}</span> 個
                               </p>
                             </div>
                           </div>

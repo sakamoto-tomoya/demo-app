@@ -70,6 +70,44 @@ export interface OutboundRecord {
   createdAt: string;
 }
 
+/** 部品マスタ（メーカー品番一覧の登録用。入庫・出庫で部品名・単価の参照に利用） */
+export interface PartsMasterRecord {
+  id: string;
+  /** 部品品番（図番） */
+  partNo: string;
+  /** 部品名称 */
+  partName: string;
+  /** ガス種（任意） */
+  gasType?: string;
+  /** 参考単価・定価（任意） */
+  partCost?: number;
+  createdAt: string;
+}
+
+/** 登録一覧テーブル用の1行。列マッピングを明確にする */
+export type RegisteredPartRow = {
+  id: string;
+  partNumber: string | null;
+  partName: string | null;
+  gasType: string | null;
+  unitPrice: number | null;
+};
+
+/**
+ * 製品型番・製品品番に対する部品品番の対応（Difyナレッジ用）。
+ * 型式/品番ごとに部品一覧を登録し、ナレッジとしてDifyに送信できる。
+ */
+export interface ProductPartsKnowledgeRecord {
+  id: string;
+  /** 製品型番 または 製品品番 */
+  productCode: string;
+  /** 製品名（任意・表示用） */
+  productName?: string;
+  /** 対応する部品品番の一覧 */
+  partNos: string[];
+  createdAt: string;
+}
+
 /** 車載部品（pms_車載部品）＝在庫・棚卸のマスタ */
 export interface VehiclePartRecord {
   id: string;

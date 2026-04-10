@@ -332,10 +332,10 @@ export const CompletionFormSection = forwardRef<
     totalWithTax,
   ]);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
-    updateCase(id, getCompletionPayload());
+    await updateCase(id, getCompletionPayload());
     setSaved(true);
   };
 
@@ -363,9 +363,9 @@ export const CompletionFormSection = forwardRef<
     );
   }
 
-  const handleSaveClick = (e: React.MouseEvent) => {
+  const handleSaveClick = async (e: React.MouseEvent) => {
     e.preventDefault();
-    handleSave(e as unknown as React.FormEvent);
+    await handleSave(e as unknown as React.FormEvent);
   };
 
   return (
@@ -706,8 +706,7 @@ export const CompletionFormSection = forwardRef<
             </table>
           </div>
 
-          {form.partsRows.some((r) => (r.partName || "").trim() === "ボタン軸") && (
-            <div className="space-y-4 rounded-lg border border-[var(--border)] bg-[var(--card)]/50 p-4">
+          <div className="space-y-4 rounded-lg border border-[var(--border)] bg-[var(--card)]/50 p-4">
               <label className="block">
                 <span className="text-sm font-medium text-[var(--foreground)]">パーキングを使用しましたか？</span>
                 <div className="mt-2 flex flex-wrap items-center gap-4">
@@ -1089,18 +1088,7 @@ export const CompletionFormSection = forwardRef<
                 </div>
               </div>
             </div>
-          )}
 
-          <label className="block">
-            <span className="text-sm font-medium text-[var(--foreground)]">備考</span>
-            <textarea
-              value={form.completionRemarks ?? ""}
-              onChange={(e) => setForm((p) => ({ ...p, completionRemarks: e.target.value }))}
-              rows={3}
-              className={inputClass}
-              placeholder="備考を入力"
-            />
-          </label>
         </div>
 
         {!hideSaveButton && (
@@ -1120,18 +1108,21 @@ export const CompletionFormSection = forwardRef<
         open={barcodeScannerOpen}
         onClose={() => setBarcodeScannerOpen(false)}
         onDetected={(value) => {
-          const partName = getPartNameByPartNo(value) ?? "";
-          const unitPrice = getPartUnitPriceFromInbound(value);
-          const byOrder = getRemainingQtyByOrderNo(value);
+          // バーコード/スマホ読み取りは「先頭0を落とさない」ため文字列のまま保持しつつ、
+          // 全角数字など表記ゆれだけ正規化する。
+          const scannedPartNo = normalizePartNo(value);
+          const partName = getPartNameByPartNo(scannedPartNo) ?? "";
+          const unitPrice = getPartUnitPriceFromInbound(scannedPartNo);
+          const byOrder = getRemainingQtyByOrderNo(scannedPartNo);
           const orderNo = byOrder.length > 0 ? byOrder[0].orderNo : "";
-          const qtyRaw = orderNo ? getOrderRemainingRaw(value, orderNo) : null;
+          const qtyRaw = orderNo ? getOrderRemainingRaw(scannedPartNo, orderNo) : null;
           setForm((p) => {
             const idx = barcodeScanTargetRowIndex;
             const rows = [...p.partsRows];
             const newRow = {
               partName,
               orderNos: orderNo ? [orderNo] : (rows[idx]?.orderNos ?? [""]),
-              partNo: value,
+              partNo: scannedPartNo,
               qty: qtyRaw != null ? String(qtyRaw) : (rows[idx]?.qty ?? ""),
               unitPrice: unitPrice != null ? String(unitPrice) : (rows[idx]?.unitPrice ?? ""),
             };

@@ -50,10 +50,12 @@ export default function InvoiceHistoryPage() {
   const [autoMatchMessage, setAutoMatchMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const cases = getAllCases();
-    const filtered = cases.filter(isInvoiceIssuedCase);
-    filtered.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-    setFullList(filtered);
+    void (async () => {
+      const cases = await getAllCases();
+      const filtered = cases.filter(isInvoiceIssuedCase);
+      filtered.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+      setFullList(filtered);
+    })();
   }, []);
 
   const list = useMemo(() => {
@@ -99,14 +101,12 @@ export default function InvoiceHistoryPage() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              const result = runAutoMatch();
-              setFullList((prev) => {
-                const cases = getAllCases();
-                const filtered = cases.filter(isInvoiceIssuedCase);
-                filtered.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-                return filtered;
-              });
+            onClick={async () => {
+              const result = await runAutoMatch();
+              const cases = await getAllCases();
+              const filtered = cases.filter(isInvoiceIssuedCase);
+              filtered.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+              setFullList(filtered);
               setAutoMatchMessage(
                 result.updated > 0
                   ? `${result.updated}件を入金済に更新しました（${result.checked}件を照合）`
@@ -242,9 +242,9 @@ export default function InvoiceHistoryPage() {
                         <input
                           type="date"
                           value={(c.completionExpectedPaymentDate ?? "").slice(0, 10)}
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const v = e.target.value;
-                            updateCase(c.id, { completionExpectedPaymentDate: v || undefined });
+                            await updateCase(c.id, { completionExpectedPaymentDate: v || undefined });
                             setFullList((prev) =>
                               prev.map((r) =>
                                 r.id === c.id ? { ...r, completionExpectedPaymentDate: v || undefined } : r
@@ -287,7 +287,7 @@ export default function InvoiceHistoryPage() {
                         {(c.completionRecipientAddress ?? c.billingAddress ?? c.requestAddress ?? "").trim() || "—"}
                       </td>
                       <td className="px-4 py-3 text-right text-[var(--foreground)]">
-                        {amount ? `¥${Number(amount).toLocaleString()}` : "—"}
+                        {amount ? Number(amount).toLocaleString() : "—"}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <a
@@ -326,9 +326,9 @@ export default function InvoiceHistoryPage() {
           caseRecord={paymentModalCase}
           selectedValue={paymentModalValue}
           onSelect={setPaymentModalValue}
-          onConfirm={() => {
+          onConfirm={async () => {
             if (!paymentModalCase) return;
-            updateCase(paymentModalCase.id, {
+            await updateCase(paymentModalCase.id, {
               completionPaymentReceived: paymentModalValue,
             });
             setFullList((prev) =>
@@ -367,7 +367,7 @@ function PaymentStatusModal({
   const specifiedNo = (caseRecord.completionRecipientSpecifiedNo ?? caseRecord.requestSpecifiedNo ?? "").trim() || "—";
   const recipientName = (caseRecord.completionRecipient ?? caseRecord.billingName ?? caseRecord.requestStoreName ?? "").trim() || "—";
   const postalCode = (caseRecord.completionRecipientPostalCode ?? caseRecord.billingPostalCode ?? "").trim() || "—";
-  const amount = caseRecord.completionTotalAmount ? `¥${Number(caseRecord.completionTotalAmount).toLocaleString()}` : "—";
+  const amount = caseRecord.completionTotalAmount ? Number(caseRecord.completionTotalAmount).toLocaleString() : "—";
 
   return (
     <div

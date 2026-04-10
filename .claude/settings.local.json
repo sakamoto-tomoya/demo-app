@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.figma.com)",
+      "WebSearch",
+      "WebFetch(domain:cursor.directory)",
+      "Bash(uvx --version)",
+      "Bash(pandoc --version)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

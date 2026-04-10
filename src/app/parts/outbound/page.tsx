@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { getAllOutbound, addOutbound, deleteOutbound, clearAllOutbound, decrementVehiclePartByPartNo, findVehiclePartByPartNo, getInboundByPartNo, getOrderInboundQty, getOrderRemainingRaw, getRemainingQtyByOrderNo, normalizePartNo, type OutboundRecord } from "@/lib/parts-store";
+import { getAllOutbound, addOutbound, deleteOutbound, clearAllOutbound, decrementVehiclePartByPartNo, findVehiclePartByPartNo, findPartsMasterByPartNo, getInboundByPartNo, getOutboundByPartNo, getOrderInboundQty, getOrderRemainingRaw, getRemainingQtyByOrderNo, normalizePartNo, type OutboundRecord } from "@/lib/parts-store";
+import { formatYen, parsePrice } from "@/lib/price-utils";
 import { getAssigneeNames } from "@/lib/settings";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 
@@ -102,16 +103,24 @@ export default function PartsOutboundPage() {
     }));
   }, [currentUserName, currentUserLoading]);
 
-  /** 部品品番入力時、部品名称・部品代を自動反映。オーダー番号は入庫残（FIFO）の先頭を自動転記。 */
+  /** 部品品番入力時、部品マスタ→車載部品→入庫履歴の順で部品名称・部品代を反映。マスタにヒットしたら partNo/partName/partCost はマスタの正規値で上書き。オーダー番号は入庫残（FIFO）の先頭を自動転記。 */
   const handlePartNoChange = (value: string) => {
     setForm((p) => {
       const next = { ...p, partNo: value };
       if (normalizePartNo(value) === "582145100") next.partName = "ボタン軸";
-      const fromVehicle = findVehiclePartByPartNo(value);
-      if (fromVehicle?.partName?.trim()) next.partName = fromVehicle.partName.trim();
-      const inbounds = getInboundByPartNo(value);
-      const latestInbound = inbounds[0];
-      if (latestInbound?.partCost != null) next.partCost = String(latestInbound.partCost);
+      const fromMaster = findPartsMasterByPartNo(value);
+      if (fromMaster) {
+        next.partNo = fromMaster.partNo ?? value;
+        next.partName = (fromMaster.partName ?? "").trim() || next.partNo;
+        const cost = fromMaster.partCost != null ? parsePrice(fromMaster.partCost) : null;
+        next.partCost = cost !== null ? String(cost) : "";
+      } else {
+        const fromVehicle = findVehiclePartByPartNo(value);
+        if (fromVehicle?.partName?.trim()) next.partName = fromVehicle.partName.trim();
+        const inbounds = getInboundByPartNo(value);
+        const latestInbound = inbounds[0];
+        if (latestInbound?.partCost != null) next.partCost = String(latestInbound.partCost);
+      }
       const remainingByOrder = getRemainingQtyByOrderNo(value);
       const firstOrder = remainingByOrder[0];
       if (firstOrder?.orderNo !== undefined) next.orderNo = firstOrder.orderNo;
@@ -149,6 +158,21 @@ export default function PartsOutboundPage() {
     }
     const qty = Number(form.outboundQty) || 0;
     const partNo = form.partNo.trim();
+    if (!partNo) {
+      alert("部品品番を入力してください。");
+      return;
+    }
+    const inbounds = getInboundByPartNo(partNo);
+    const outbounds = getOutboundByPartNo(partNo);
+    const inboundTotal = inbounds.reduce((s, i) => s + (Number(i.inboundQty) || 0), 0);
+    const outboundTotal = outbounds.reduce((s, o) => s + (Number(o.outboundQty) || 0), 0);
+    const stock = inboundTotal - outboundTotal;
+    if (stock < qty) {
+      alert(
+        `出庫登録できません。在庫（入庫−出庫）は${stock}個です。${qty}個の出庫は登録できません。`
+      );
+      return;
+    }
     const orderNo = form.orderNo ?? "";
     const remainingByOrder = getRemainingQtyByOrderNo(partNo);
     const orderRemaining = remainingByOrder.find((x) => x.orderNo === orderNo);
@@ -185,7 +209,7 @@ export default function PartsOutboundPage() {
       outboundPerson: form.outboundPerson,
       receptionNo: form.receptionNo || undefined,
       orderNo: form.orderNo || undefined,
-      partCost: form.partCost ? Number(form.partCost) : undefined,
+      partCost: parsePrice(form.partCost) ?? undefined,
       billingType: form.billingType || undefined,
       parkingFee: form.parkingUsed && form.parkingFee ? Number(form.parkingFee) : undefined,
       parkingReceiptImageDataUrl: form.parkingUsed ? form.parkingReceiptImageDataUrl || undefined : undefined,
@@ -727,7 +751,7 @@ export default function PartsOutboundPage() {
                         );
                       })()}
                     </td>
-                    <td className="px-3 py-2 text-right">{r.partCost != null ? r.partCost : ""}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatYen(r.partCost)}</td>
                     <td className="px-3 py-2">{r.billingType ?? ""}</td>
                     <td className="px-3 py-2 text-right">{r.parkingFee != null ? r.parkingFee : ""}</td>
                     <td className="px-3 py-2">

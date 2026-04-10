@@ -5,6 +5,7 @@ const menuItems = [
   { href: "/parts/outbound", label: "出庫" },
   { href: "/parts/stock-search", label: "在庫検索" },
   { href: "/parts/inventory", label: "棚卸" },
+  { href: "/parts/master", label: "部品マスタ" },
 ];
 
 export default function PartsPage() {

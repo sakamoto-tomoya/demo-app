@@ -1,11 +1,19 @@
 "use client";
 
-import type { InboundRecord, OutboundRecord, VehiclePartRecord } from "./parts-types";
-export type { InboundRecord, OutboundRecord, VehiclePartRecord };
+import type { InboundRecord, OutboundRecord, VehiclePartRecord, PartsMasterRecord, ProductPartsKnowledgeRecord } from "./parts-types";
+export type { InboundRecord, OutboundRecord, VehiclePartRecord, PartsMasterRecord, ProductPartsKnowledgeRecord };
 
 const INBOUND_KEY = "gyoumukannri_parts_inbound";
 const OUTBOUND_KEY = "gyoumukannri_parts_outbound";
 const VEHICLE_PARTS_KEY = "gyoumukannri_parts_vehicle";
+const PARTS_MASTER_KEY = "gyoumukannri_parts_master";
+const PRODUCT_PARTS_KNOWLEDGE_KEY = "gyoumukannri_product_parts_knowledge";
+
+/** 同一タブ内の画面でも在庫表示を更新できるよう通知（localStorage の storage イベントは同一タブでは発火しない） */
+function notifyPartsStorageChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("gyoumukannri-parts-storage"));
+}
 
 function loadInbound(): InboundRecord[] {
   if (typeof window === "undefined") return [];
@@ -22,6 +30,7 @@ function loadInbound(): InboundRecord[] {
 function saveInbound(list: InboundRecord[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(INBOUND_KEY, JSON.stringify(list));
+  notifyPartsStorageChanged();
 }
 
 function loadOutbound(): OutboundRecord[] {
@@ -39,6 +48,7 @@ function loadOutbound(): OutboundRecord[] {
 function saveOutbound(list: OutboundRecord[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(OUTBOUND_KEY, JSON.stringify(list));
+  notifyPartsStorageChanged();
 }
 
 function loadVehicleParts(): VehiclePartRecord[] {
@@ -56,12 +66,352 @@ function loadVehicleParts(): VehiclePartRecord[] {
 function saveVehicleParts(list: VehiclePartRecord[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(VEHICLE_PARTS_KEY, JSON.stringify(list));
+  notifyPartsStorageChanged();
 }
 
-/** 部品品番の比較用：前後空白除去・全角数字を半角に統一 */
+/** 部品品番の比較用：前後空白除去・全角数字を半角に統一・ハイフン類を除去（入庫と出庫の表記揺れで集計が分かれないようにする） */
 export function normalizePartNo(partNo: string): string {
-  const t = (partNo ?? "").trim();
-  return t.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+  let t = (partNo ?? "").trim();
+  t = t.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+  t = t.replace(/[\u002D\u00AD\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, "");
+  return t;
+}
+
+/** 日本語（CJK）の文字数を数える */
+function countCjk(s: string): number {
+  const cjk = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\uff00-\uffef]/g;
+  const m = s.match(cjk);
+  return m ? m.length : 0;
+}
+
+/** 文字化けした文字列を修復（UTF-8として読まれたShift_JISバイト列を正しく解釈し直す） */
+function tryFixMojibake(s: string): string {
+  if (!s || typeof s !== "string") return s;
+  // よくある「繝ｸ繝ｳ…」「霆ｸ」「譁ｭ…」などのパターンを含む場合のみ変換を試す
+  // （正しい日本語を無駄に変換してしまうのを避ける）
+  const looksMojibake = /[繝譁霆ｸｳｳ繧繝]/.test(s);
+  if (!looksMojibake) return s;
+  try {
+    const utf8Bytes = new TextEncoder().encode(s);
+
+    // 変換1: UTF-8としてエンコードしたバイト列を Shift_JIS として復元
+    const cand1 = new TextDecoder("shift_jis").decode(utf8Bytes);
+
+    // 変換2: 文字コードの下位8bitをバイト列として扱い、UTF-8 として復元
+    const bytesFromChars = new Uint8Array(
+      Array.from(s).map((ch) => ch.charCodeAt(0) & 0xff)
+    );
+    const cand2 = new TextDecoder("utf-8").decode(bytesFromChars);
+
+    const valid1 = !cand1.includes("\uFFFD");
+    const valid2 = !cand2.includes("\uFFFD");
+    const c0 = countCjk(s);
+    const c1 = countCjk(cand1);
+    const c2 = countCjk(cand2);
+
+    // 文字化け特有の「繝」や「霆」などが減り、日本語(CJK)が増える方を採用
+    const bad0 = (s.match(/[繝譁霆ｸｳｳ繧繝]/g) ?? []).length;
+    const bad1 = (cand1.match(/[繝譁霆ｸｳｳ繧繝]/g) ?? []).length;
+    const bad2 = (cand2.match(/[繝譁霆ｸｳｳ繧繝]/g) ?? []).length;
+
+    const score = (cCand: number, badCand: number): number => {
+      return (cCand - c0) * 10 + (bad0 - badCand);
+    };
+
+    let best = s;
+    let bestScore = 0;
+
+    if (valid1) {
+      const sc1 = score(c1, bad1);
+      if (sc1 > bestScore) {
+        bestScore = sc1;
+        best = cand1;
+      }
+    }
+    if (valid2) {
+      const sc2 = score(c2, bad2);
+      if (sc2 > bestScore) {
+        bestScore = sc2;
+        best = cand2;
+      }
+    }
+
+    return best;
+  } catch {
+    // shift_jis が未対応または不正な並びの場合はそのまま
+  }
+  return s;
+}
+
+// --- 部品マスタ ---
+function loadPartsMaster(): PartsMasterRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(PARTS_MASTER_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as PartsMasterRecord[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePartsMaster(list: PartsMasterRecord[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(PARTS_MASTER_KEY, JSON.stringify(list));
+}
+
+export function getAllPartsMaster(): PartsMasterRecord[] {
+  const list = loadPartsMaster();
+  // 画面描画直前: 直近の1件を確認できるようにする（モジバケ切り分け用）
+  try {
+    const first = list[0];
+    console.log("[parts-store] getAllPartsMaster: first.raw=", first?.partName ?? "", "len=", (first?.partName ?? "").length);
+  } catch {
+    // ignore
+  }
+  return list.map((r) => ({
+    ...r,
+    partNo: tryFixMojibake(r.partNo ?? ""),
+    partName: tryFixMojibake(r.partName ?? ""),
+  }));
+}
+
+/** 保存されている部品マスタの文字化けを修復して上書き保存する。1回だけ実行すればよい。 */
+export function migratePartsMasterMojibake(): number {
+  const list = loadPartsMaster();
+  let changed = 0;
+  const fixed = list.map((r) => {
+    const partNo = tryFixMojibake(r.partNo ?? "");
+    const partName = tryFixMojibake(r.partName ?? "");
+    if (partNo !== (r.partNo ?? "") || partName !== (r.partName ?? "")) changed++;
+    return { ...r, partNo, partName };
+  });
+  if (changed > 0) savePartsMaster(fixed);
+  return changed;
+}
+
+/** 単価の有効範囲：0円～10万円（0は「¥0」表示のため有効） */
+const MIN_VALID_PART_COST = 0;
+const MAX_VALID_PART_COST = 100_000;
+
+/** 不正な単価（0円未満または10万円超）をクリアして上書き保存する。1回だけ実行すればよい。 */
+export function migratePartsMasterPartCost(): number {
+  const list = loadPartsMaster();
+  let changed = 0;
+  const fixed = list.map((r) => {
+    if (r.partCost != null && (r.partCost < MIN_VALID_PART_COST || r.partCost > MAX_VALID_PART_COST)) {
+      changed++;
+      return { ...r, partCost: undefined as number | undefined };
+    }
+    return r;
+  });
+  if (changed > 0) savePartsMaster(fixed);
+  return changed;
+}
+
+export function findPartsMasterByPartNo(partNo: string): PartsMasterRecord | null {
+  const key = normalizePartNo(partNo ?? "");
+  if (!key) return null;
+  return getAllPartsMaster().find((r) => normalizePartNo(r.partNo ?? "") === key) ?? null;
+}
+
+export function addPartsMaster(record: Omit<PartsMasterRecord, "id" | "createdAt">): PartsMasterRecord {
+  const list = loadPartsMaster();
+  const newRecord: PartsMasterRecord = {
+    ...record,
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+  };
+  list.push(newRecord);
+  savePartsMaster(list);
+  return newRecord;
+}
+
+export function deletePartsMaster(id: string): boolean {
+  const list = loadPartsMaster().filter((r) => r.id !== id);
+  if (list.length === loadPartsMaster().length) return false;
+  savePartsMaster(list);
+  return true;
+}
+
+/** 部品マスタの登録一覧をすべて削除する */
+export function clearAllPartsMaster(): void {
+  savePartsMaster([]);
+}
+
+/** 部品マスタの「部品品番」と「部品名称」を全件入れ替える。列取り込み間違いの修正用。戻り値は入れ替えた件数。 */
+export function swapPartsMasterPartNoAndPartName(): number {
+  const list = loadPartsMaster();
+  let count = 0;
+  const fixed = list.map((r) => {
+    const no = r.partNo ?? "";
+    const name = r.partName ?? "";
+    if (!no || !name || no === name) return r;
+    count++;
+    return { ...r, partNo: name, partName: no };
+  });
+  if (count > 0) savePartsMaster(fixed);
+  return count;
+}
+
+/** 入庫登録時に部品マスタの単価を反映する。既存なら単価（と部品名）を更新、なければ追加。 */
+export function syncPartsMasterFromInbound(partNo: string, partName: string, partCost: number | undefined): void {
+  const list = loadPartsMaster();
+  const key = normalizePartNo(partNo ?? "");
+  if (!key) return;
+  const existingIndex = list.findIndex((r) => normalizePartNo(r.partNo ?? "") === key);
+  const name = (partName ?? "").trim() || partNo;
+  if (existingIndex >= 0) {
+    list[existingIndex] = { ...list[existingIndex], partNo: list[existingIndex].partNo, partName: name, partCost: partCost ?? list[existingIndex].partCost, createdAt: list[existingIndex].createdAt };
+  } else {
+    list.push({
+      id: crypto.randomUUID(),
+      partNo,
+      partName: name,
+      partCost,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  savePartsMaster(list);
+}
+
+/** 部品マスタを一括登録。品番が既存なら上書き（部品名・ガス種・単価を更新）。戻り値は登録・更新した件数。 */
+export function importPartsMasterFromRows(
+  rows: { partNo: string; partName: string; gasType?: string; partCost?: number }[]
+): { added: number; updated: number } {
+  // CSV読込直後: rows の先頭1件を確認
+  try {
+    const first = rows[0];
+    console.log("[parts-store] importPartsMasterFromRows: first.row=", first);
+    console.log("[parts-store] importPartsMasterFromRows: first.partName(raw)=", first?.partName ?? "");
+  } catch {
+    // ignore
+  }
+  const list = loadPartsMaster();
+  let added = 0;
+  let updated = 0;
+  for (const row of rows) {
+    const partNo = (row.partNo ?? "").trim();
+    if (!partNo) continue;
+    const key = normalizePartNo(partNo);
+    // 保存時点でも文字化けを直しておく（表示だけ直しても入力欄等で未修復の値が出るケースを防ぐ）
+    const rawPartName = (row.partName ?? "").trim();
+    const fixedPartName = tryFixMojibake(rawPartName || partNo);
+    const gasType = (row.gasType ?? "").trim() || undefined;
+    const partCost = row.partCost != null ? Number(row.partCost) : undefined;
+    const existingIndex = list.findIndex((r) => normalizePartNo(r.partNo ?? "") === key);
+    if (existingIndex >= 0) {
+      // DB保存前: 変更される対象の1件を確認（大量に出るのを避けて最初の更新だけ）
+      if (updated === 0) {
+        console.log("[parts-store] importPartsMasterFromRows: beforeUpdate existing=", list[existingIndex], "new.partName.fixed=", fixedPartName);
+      }
+      list[existingIndex] = { ...list[existingIndex], partNo, partName: fixedPartName, gasType, partCost, createdAt: list[existingIndex].createdAt };
+      updated++;
+    } else {
+      list.push({
+        id: crypto.randomUUID(),
+        partNo,
+        partName: fixedPartName,
+        gasType,
+        partCost,
+        createdAt: new Date().toISOString(),
+      });
+      added++;
+    }
+  }
+
+  // DB保存後: 保存した後に再取得して先頭1件を確認
+  try {
+    savePartsMaster(list);
+    const reloaded = loadPartsMaster();
+    console.log("[parts-store] importPartsMasterFromRows: afterSave first.reloaded.partName=", reloaded[0]?.partName ?? "");
+    return {
+      added,
+      updated,
+    };
+  } catch (e) {
+    // ここに来たら savePartsMaster 前後で例外が出ているので、そのまま落ちるようにする
+    throw e;
+  }
+}
+
+// --- 製品型番・製品品番 → 部品品番（ナレッジ）---
+function loadProductPartsKnowledge(): ProductPartsKnowledgeRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(PRODUCT_PARTS_KNOWLEDGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as ProductPartsKnowledgeRecord[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveProductPartsKnowledge(list: ProductPartsKnowledgeRecord[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(PRODUCT_PARTS_KNOWLEDGE_KEY, JSON.stringify(list));
+}
+
+export function getAllProductPartsKnowledge(): ProductPartsKnowledgeRecord[] {
+  return loadProductPartsKnowledge();
+}
+
+export function getProductPartsKnowledgeByProductCode(productCode: string): ProductPartsKnowledgeRecord | null {
+  const key = normalizePartNo(productCode ?? "");
+  if (!key) return null;
+  return loadProductPartsKnowledge().find((r) => normalizePartNo(r.productCode ?? "") === key) ?? null;
+}
+
+export function getPartNosByProductCode(productCode: string): string[] {
+  const rec = getProductPartsKnowledgeByProductCode(productCode);
+  return rec?.partNos ?? [];
+}
+
+export function addOrUpdateProductPartsKnowledge(
+  productCode: string,
+  productName: string | undefined,
+  partNos: string[]
+): ProductPartsKnowledgeRecord {
+  const list = loadProductPartsKnowledge();
+  const code = (productCode ?? "").trim();
+  const key = normalizePartNo(code);
+  const partNosTrimmed = partNos.map((p) => (p ?? "").trim()).filter(Boolean);
+  const existingIndex = key ? list.findIndex((r) => normalizePartNo(r.productCode ?? "") === key) : -1;
+  const record: ProductPartsKnowledgeRecord = {
+    id: existingIndex >= 0 ? list[existingIndex].id : crypto.randomUUID(),
+    productCode: code,
+    productName: (productName ?? "").trim() || undefined,
+    partNos: partNosTrimmed,
+    createdAt: existingIndex >= 0 ? list[existingIndex].createdAt : new Date().toISOString(),
+  };
+  if (existingIndex >= 0) {
+    list[existingIndex] = record;
+  } else {
+    list.push(record);
+  }
+  saveProductPartsKnowledge(list);
+  return record;
+}
+
+export function deleteProductPartsKnowledge(id: string): boolean {
+  const list = loadProductPartsKnowledge().filter((r) => r.id !== id);
+  if (list.length === loadProductPartsKnowledge().length) return false;
+  saveProductPartsKnowledge(list);
+  return true;
+}
+
+/** Difyナレッジ用テキストに整形。製品型番・製品品番ごとに部品品番一覧を列挙。 */
+export function formatProductPartsKnowledgeForDify(records: ProductPartsKnowledgeRecord[]): string {
+  const lines: string[] = ["【製品型番・製品品番と部品品番の対応】", ""];
+  for (const r of records.sort((a, b) => (a.productCode ?? "").localeCompare(b.productCode ?? ""))) {
+    const name = r.productName ? `（${r.productName}）` : "";
+    lines.push(`製品型番・品番: ${r.productCode}${name}`);
+    lines.push(`部品品番: ${(r.partNos ?? []).join(", ") || "—"}`);
+    lines.push("");
+  }
+  return lines.join("\n").trim();
 }
 
 // --- 入庫 ---
@@ -405,4 +755,77 @@ export function deleteVehiclePartByPartNo(partNo: string): boolean {
   if (list.length === loadVehicleParts().length) return false;
   saveVehicleParts(list);
   return true;
+}
+
+/** AI修理アシスト：型式に紐づく部品の在庫行（製品型番ナレッジ → 部品マスタのキーワード補完） */
+export type RelatedPartStockRow = {
+  partNo: string;
+  partName: string;
+  warehouseRemaining: number;
+  vehicleQty: number;
+  source: "product_knowledge" | "name_match";
+};
+
+const MAX_NAME_MATCH_ROWS = 25;
+
+function modelMatchesProductKnowledge(model: string, productCode: string, productName: string): boolean {
+  const m = model.trim().toLowerCase();
+  const c = (productCode ?? "").trim().toLowerCase();
+  const n = (productName ?? "").trim().toLowerCase();
+  if (!m) return false;
+  if (c && (m.includes(c) || c.includes(m))) return true;
+  if (n && (m.includes(n) || n.includes(m))) return true;
+  return false;
+}
+
+/**
+ * 型式名から関連する部品品番を推定し、入庫−出庫の残（オーダー別合算）と車載数量を返す。
+ * ブラウザの部品管理（localStorage）のみ参照する。
+ */
+export function getRelatedPartsStockForModel(modelName: string): RelatedPartStockRow[] {
+  const q = (modelName ?? "").trim();
+  if (!q) return [];
+
+  const seen = new Set<string>();
+  const rows: RelatedPartStockRow[] = [];
+
+  const pushRow = (partNoRaw: string, source: RelatedPartStockRow["source"]) => {
+    const key = normalizePartNo(partNoRaw);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    const master = findPartsMasterByPartNo(partNoRaw);
+    const inbound = getInboundByPartNo(partNoRaw)[0];
+    const partName = master?.partName?.trim() || inbound?.partName?.trim() || key;
+    const remainings = getRemainingQtyByOrderNo(partNoRaw);
+    const warehouseRemaining = remainings.reduce((s, x) => s + x.remaining, 0);
+    const vehicleQty = getVehiclePartQuantityByPartNo(partNoRaw);
+    rows.push({ partNo: key, partName, warehouseRemaining, vehicleQty, source });
+  };
+
+  for (const rec of getAllProductPartsKnowledge()) {
+    if (!modelMatchesProductKnowledge(q, rec.productCode ?? "", rec.productName ?? "")) continue;
+    for (const p of rec.partNos ?? []) {
+      if ((p ?? "").trim()) pushRow(p.trim(), "product_knowledge");
+    }
+  }
+
+  const qLower = q.toLowerCase();
+  let nameMatches = 0;
+  for (const m of getAllPartsMaster()) {
+    if (nameMatches >= MAX_NAME_MATCH_ROWS) break;
+    const key = normalizePartNo(m.partNo);
+    if (!key || seen.has(key)) continue;
+    const name = (m.partName ?? "").toLowerCase();
+    if (name.includes(qLower) || key.toLowerCase().includes(qLower)) {
+      pushRow(m.partNo, "name_match");
+      nameMatches += 1;
+    }
+  }
+
+  return rows.sort((a, b) => {
+    const pri = (s: RelatedPartStockRow["source"]) => (s === "product_knowledge" ? 0 : 1);
+    const d = pri(a.source) - pri(b.source);
+    if (d !== 0) return d;
+    return a.partNo.localeCompare(b.partNo);
+  });
 }

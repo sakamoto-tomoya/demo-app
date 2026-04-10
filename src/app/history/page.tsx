@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getAllCases } from "@/lib/store";
+import { getAllCases, deleteCase } from "@/lib/store";
 import { getStatusLabel, type CaseRecord } from "@/lib/types";
 
 const inputClass =
@@ -25,7 +25,7 @@ export default function HistoryPage() {
   const [phone, setPhone] = useState("");
 
   useEffect(() => {
-    setCases(getAllCases());
+    void getAllCases().then(setCases);
   }, []);
 
   const filtered = cases.filter((c) => {
@@ -42,7 +42,7 @@ export default function HistoryPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-bold text-[var(--foreground)] sm:text-2xl">
-        履歴検索
+        受付履歴検索
       </h1>
       <p className="text-[var(--muted)]">
         お客様名・受付番号・電話番号で案件を検索できます。
@@ -92,12 +92,13 @@ export default function HistoryPage() {
                 <th className="border-b border-[var(--border)] px-3 py-2 text-left">受付日</th>
                 <th className="border-b border-[var(--border)] px-3 py-2 text-left">完了日</th>
                 <th className="border-b border-[var(--border)] px-3 py-2 text-left">操作</th>
+                <th className="border-b border-[var(--border)] px-3 py-2 text-left">削除</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-4 text-center text-[var(--muted)]">
+                  <td colSpan={9} className="px-3 py-4 text-center text-[var(--muted)]">
                     {cases.length === 0 ? "案件がありません" : "条件に一致する案件がありません"}
                   </td>
                 </tr>
@@ -122,6 +123,20 @@ export default function HistoryPage() {
                       >
                         詳細
                       </Link>
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (window.confirm("この案件を削除しますか？")) {
+                            await deleteCase(c.id);
+                            setCases(await getAllCases());
+                          }
+                        }}
+                        className="text-sm text-[var(--destructive)] hover:underline"
+                      >
+                        削除
+                      </button>
                     </td>
                   </tr>
                 ))

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { getAllInbound, addInbound, deleteInbound, addOrIncrementVehiclePart, findVehiclePartByPartNo, normalizePartNo, type InboundRecord } from "@/lib/parts-store";
+import { getAllInbound, addInbound, deleteInbound, addOrIncrementVehiclePart, findVehiclePartByPartNo, findPartsMasterByPartNo, normalizePartNo, syncPartsMasterFromInbound, type InboundRecord } from "@/lib/parts-store";
+import { formatYen, parsePrice } from "@/lib/price-utils";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 import { getDefaultInboundHandlerName, getDefaultOutboundHandlerName, getAssigneeNames, getEmailByAssigneeName } from "@/lib/settings";
 
@@ -108,7 +109,7 @@ export default function PartsInboundPage() {
     e.target.value = "";
   };
 
-  /** 部品品番が変更されたとき、582145100なら部品名「ボタン軸」・単価800・入庫数1を自動転記。それ以外はマスター/過去入庫から部品名・入庫数1を反映。単価は保存履歴（入庫）を参照して自動反映 */
+  /** 部品品番が変更されたとき、部品マスタ→車載部品→過去入庫の順で部品名・単価・入庫数1を反映。マスタにヒットしたら partNo/partName/partCost はマスタの正規値で上書きする（図番と部品名称の混同を防ぐ） */
   const handlePartNoChange = (value: string) => {
     setForm((p) => {
       const next = { ...p, partNo: value };
@@ -120,6 +121,15 @@ export default function PartsInboundPage() {
         return next;
       }
       if (!key) return next;
+      const fromMaster = findPartsMasterByPartNo(value);
+      if (fromMaster) {
+        next.partNo = fromMaster.partNo ?? value;
+        next.partName = (fromMaster.partName ?? "").trim() || next.partNo;
+        const cost = fromMaster.partCost != null ? parsePrice(fromMaster.partCost) : null;
+        next.partCost = cost !== null ? String(cost) : "";
+        next.inboundQty = 1;
+        return next;
+      }
       const fromVehicle = findVehiclePartByPartNo(value);
       if (fromVehicle) {
         if (fromVehicle.partName?.trim()) next.partName = fromVehicle.partName.trim();
@@ -164,8 +174,8 @@ export default function PartsInboundPage() {
       nextErrors.inboundQty = "入庫数は1以上を入力してください";
     if (!form.inboundPerson.trim()) nextErrors.inboundPerson = "入庫担当者を選択してください";
     if (!form.outboundPerson?.trim()) nextErrors.outboundPerson = "出庫担当者を選択してください";
-    if (form.partCost === undefined || form.partCost === null || String(form.partCost).trim() === "")
-      nextErrors.partCost = "部品代を入力してください";
+    const partCostParsed = parsePrice(form.partCost);
+    if (partCostParsed === null) nextErrors.partCost = "部品代を入力してください";
     if (!form.orderNo?.trim()) nextErrors.orderNo = "注文番号を入力してください";
 
     if (Object.keys(nextErrors).length > 0) {
@@ -188,8 +198,7 @@ export default function PartsInboundPage() {
     } catch {
       // 変換失敗時は画像なしで登録
     }
-    const partCostNum = form.partCost !== "" && form.partCost != null ? Number(form.partCost) : undefined;
-    const isPartCostValid = partCostNum != null && !Number.isNaN(partCostNum);
+    const partCostNum = parsePrice(form.partCost);
     const record = {
       partNo: form.partNo.trim(),
       partName: form.partName.trim() || undefined,
@@ -198,7 +207,7 @@ export default function PartsInboundPage() {
       inboundQty: Number(form.inboundQty) || 0,
       inboundPerson: (form.inboundPerson ?? "").trim(),
       outboundPerson: (form.outboundPerson ?? "").trim() || undefined,
-      partCost: isPartCostValid ? partCostNum : undefined,
+      partCost: partCostNum ?? undefined,
       orderNo: (form.orderNo ?? "").trim() || undefined,
       cameraImageDataUrl: cameraData || undefined,
       photoImageDataUrl: photoData || undefined,
@@ -212,10 +221,11 @@ export default function PartsInboundPage() {
       (Number(record.inboundQty) || 0) > 0 &&
       record.inboundPerson !== "" &&
       (record.outboundPerson ?? "") !== "" &&
-      isPartCostValid &&
+      partCostNum !== null &&
       (record.orderNo ?? "") !== "";
     if (!requiredFilled) return;
     addInbound(record);
+    if (partCostNum !== null) syncPartsMasterFromInbound(record.partNo, record.partName ?? "", partCostNum);
     addOrIncrementVehiclePart({
       partNo: form.partNo,
       storagePlaceVehicle: record.inboundPlace?.trim() ?? "",
@@ -607,7 +617,7 @@ export default function PartsInboundPage() {
             </button>
             {partCostTotal !== null && (
               <span className="text-sm text-[var(--primary)]">
-                仕入額: ¥{Math.round(partCostTotal * 0.6).toLocaleString()}
+                仕入額: {Math.round(partCostTotal * 0.6).toLocaleString()}
                 <span className="ml-1.5 text-[var(--muted)] font-normal">（定価ではなく実際の仕入金額です。）</span>
               </span>
             )}
@@ -641,34 +651,63 @@ export default function PartsInboundPage() {
                         return true;
                       })
                     : list;
-                return filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={11} className="px-3 py-4 text-center text-[var(--muted)]">
-                      {list.length === 0 ? "データがありません。上記フォームで登録してください。" : "指定期間にデータがありません"}
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((r) => {
-                    const subtotal = (Number(r.partCost) || 0) * (Number(r.inboundQty) || 0);
-                    return (
-                  <tr key={r.id} className="border-b border-[var(--border)]">
-                    <td className="px-3 py-2">{r.partNo}</td>
-                    <td className="px-3 py-2">{r.inboundPlace ?? "—"}</td>
-                    <td className="px-3 py-2">{r.partName ?? ""}</td>
-                    <td className="px-3 py-2">{r.inboundDate}</td>
-                    <td className="px-3 py-2 text-right">{r.inboundQty ?? "—"}</td>
-                    <td className="px-3 py-2">{r.inboundPerson ?? "—"}</td>
-                    <td className="px-3 py-2">{r.outboundPerson ?? "—"}</td>
-                    <td className="px-3 py-2 text-right">
-                      {r.partCost != null ? Number(r.partCost).toLocaleString() : "—"}
-                    </td>
-                    <td className="px-3 py-2 text-right">{subtotal ? subtotal.toLocaleString() : "—"}</td>
-                    <td className="px-3 py-2">{r.orderNo ?? "—"}</td>
+                // 同じ部品品番でまとめ、入庫数と合計を足して表示
+                const byPartNo = new Map<string, InboundRecord[]>();
+                for (const r of filtered) {
+                  const key = normalizePartNo(r.partNo ?? "");
+                  if (!key) continue;
+                  if (!byPartNo.has(key)) byPartNo.set(key, []);
+                  byPartNo.get(key)!.push(r);
+                }
+                const aggregated = Array.from(byPartNo.entries()).map(([key, records]) => {
+                  const first = records[0];
+                  const totalQty = records.reduce((s, r) => s + (Number(r.inboundQty) || 0), 0);
+                  const totalAmount = records.reduce(
+                    (s, r) => s + (Number(r.partCost) || 0) * (Number(r.inboundQty) || 0),
+                    0
+                  );
+                  return {
+                    key,
+                    partNo: first.partNo,
+                    partName: first.partName ?? "",
+                    inboundPlace: first.inboundPlace ?? "—",
+                    inboundDate: records.length > 1 ? "複数" : (first.inboundDate ?? "—"),
+                    inboundQty: totalQty,
+                    inboundPerson: first.inboundPerson ?? "—",
+                    outboundPerson: first.outboundPerson ?? "—",
+                    partCost: first.partCost != null ? Number(first.partCost) : null,
+                    totalAmount,
+                    orderNo: records.length > 1 ? "複数" : (first.orderNo ?? "—"),
+                    records,
+                  };
+                });
+                if (aggregated.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan={11} className="px-3 py-4 text-center text-[var(--muted)]">
+                        {list.length === 0 ? "データがありません" : "指定期間にデータがありません"}
+                      </td>
+                    </tr>
+                  );
+                }
+                return aggregated.map((row) => (
+                  <tr key={row.key} className="border-b border-[var(--border)]">
+                    <td className="px-3 py-2">{row.partNo}</td>
+                    <td className="px-3 py-2">{row.inboundPlace}</td>
+                    <td className="px-3 py-2">{row.partName}</td>
+                    <td className="px-3 py-2">{row.inboundDate}</td>
+                    <td className="px-3 py-2 text-right">{row.inboundQty}</td>
+                    <td className="px-3 py-2">{row.inboundPerson}</td>
+                    <td className="px-3 py-2">{row.outboundPerson}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatYen(row.partCost)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatYen(row.totalAmount)}</td>
+                    <td className="px-3 py-2">{row.orderNo}</td>
                     <td className="px-3 py-2">
                       <button
                         type="button"
                         onClick={() => {
-                          deleteInbound(r.id);
+                          if (!confirm(`部品品番「${row.partNo}」の入庫を${row.records.length}件すべて削除しますか？`)) return;
+                          row.records.forEach((r) => deleteInbound(r.id));
                           setList(getAllInbound());
                         }}
                         className="rounded border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-xs font-medium text-[var(--foreground)] hover:bg-red-50 hover:border-red-300 hover:text-red-700"
@@ -677,9 +716,7 @@ export default function PartsInboundPage() {
                       </button>
                     </td>
                   </tr>
-                    );
-                  })
-                );
+                ));
               })()}
             </tbody>
           </table>

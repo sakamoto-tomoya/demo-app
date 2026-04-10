@@ -6,10 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:init": "tsx scripts/init-db.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:import-parts": "tsx scripts/import-parts-master.ts",
+    "seed:completion-knowledge": "tsx scripts/seed-completion-knowledge.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.87.0",
+    "@azure/ai-form-recognizer": "^5.1.0",
     "@google-cloud/documentai": "^9.5.0",
+    "@libsql/client": "^0.14.0",
+    "@lobehub/icons": "^5.4.0",
     "date-fns": "^4.1.0",
     "html5-qrcode": "^2.3.8",
     "install": "^0.13.0",
@@ -22,8 +30,11 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-leaflet": "^5.0.0",
+    "react-markdown": "^10.1.0",
+    "sharp": "^0.34.5",
     "tesseract.js": "^7.0.0",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -35,6 +46,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "typescript": "^5"
   }
 }

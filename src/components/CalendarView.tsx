@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   startOfMonth,
@@ -18,6 +18,7 @@ import { ja } from "date-fns/locale";
 import { getAllCases, shouldAlert, deleteCase } from "@/lib/store";
 import { CASE_STATUS_LABELS, getStatusLabel, type CaseStatus, type CaseRecord } from "@/lib/types";
 import { ALERT_DAYS_THRESHOLD } from "@/lib/types";
+import MapView from "@/components/MapView";
 
 const STATUS_ORDER: CaseStatus[] = [
   "new",
@@ -40,11 +41,37 @@ function formatAddressShort(address: string | undefined): string {
   return idx >= 0 ? s.slice(0, idx + 2) : s;
 }
 
+function formatVisitDate(value: string | null | undefined): string {
+  const raw = (value ?? "").trim();
+  if (!raw) return "";
+  try {
+    return format(parseISO(raw), "yyyy/MM/dd", { locale: ja });
+  } catch {
+    return raw;
+  }
+}
+
+function formatConfirmedTime(c: CaseRecord): string {
+  if (c.visitTimeMorningContact) return "当日朝連絡";
+  const s = (c.visitTimeStart ?? "").trim();
+  const e = (c.visitTimeEnd ?? "").trim();
+  if (s && e) return `${s}～${e}`;
+  if (s) return s;
+  if (e) return e;
+  return "未設定";
+}
+
 type Props = {
   statusFilter: CaseStatus | null;
   /** 担当者で絞り込み（指定時は assignedTo が一致する案件のみ表示） */
   assigneeFilter?: string | null;
+  /** URLクエリから渡す選択日（yyyy-MM-dd） */
+  selectedDateFromQuery?: string | null;
 };
+
+function normalizeAssigneeName(v: string | undefined | null): string {
+  return (v ?? "").replace(/\s+/g, "").trim();
+}
 
 function CaseRow({
   c,
@@ -68,25 +95,39 @@ function CaseRow({
             : "クリックで追加入力"
         }
       >
-        {c.receptionNo || "(番号なし)"} — {getStatusLabel(c.status)}
-        {(c.modelName || c.reportedModelName) && (
-          <> {(c.modelName && c.reportedModelName && c.modelName !== c.reportedModelName)
-            ? `${c.modelName} / ${c.reportedModelName}`
-            : (c.modelName || c.reportedModelName)}
-          </>
-        )}
-        {c.assignedTo && <> {c.assignedTo}</>}
-        {c.visitTimeMorningContact ? (
-          <> 当日朝連絡</>
-        ) : (c.contactAttemptTimes?.length ?? 0) > 0 ? (
-          <> {c.contactAttemptTimes!.join(", ")}</>
-        ) : (c.visitTimeStart || c.visitTimeEnd) ? (
-          <> {[c.visitTimeStart || "--", c.visitTimeEnd || "--"].join("～")}</>
-        ) : null}
-        {formatAddressShort(c.address) && (
-          <> {formatAddressShort(c.address)}</>
-        )}
-        <> 更新日 {format(parseISO(c.updatedAt || c.createdAt), "yyyy/MM/dd", { locale: ja })}</>
+        <div className="rounded border border-[var(--border)] bg-[var(--card)] p-2">
+          <div className="grid grid-cols-2 gap-x-3 text-[10px] font-medium text-[var(--muted)] sm:grid-cols-4">
+            <p>受付番号</p>
+            <p>現在のステータス</p>
+            <p>型式</p>
+            <p>担当者</p>
+            <p>訪問先住所</p>
+            <p>登録日</p>
+            <p>訪問日</p>
+            <p>更新日</p>
+          </div>
+          <div className="mt-1 grid grid-cols-2 gap-x-3 text-xs text-[var(--foreground)] sm:grid-cols-4">
+            <p>{c.receptionNo || "(番号なし)"}</p>
+            <p>{getStatusLabel(c.status)}</p>
+            <p>
+              {(c.modelName && c.reportedModelName && c.modelName !== c.reportedModelName)
+                ? `${c.modelName} / ${c.reportedModelName}`
+                : (c.modelName || c.reportedModelName || "未入力")}
+            </p>
+            <p>{c.assignedTo?.trim() || "未割当"}</p>
+            <p>{formatAddressShort(c.address) || "未入力"}</p>
+            <p>{format(parseISO(c.createdAt), "yyyy/MM/dd", { locale: ja })}</p>
+            <p>{c.visitDate ? formatVisitDate(c.visitDate) : "未設定"}</p>
+            <p>{format(parseISO(c.updatedAt || c.createdAt), "yyyy/MM/dd", { locale: ja })}</p>
+          </div>
+          {c.visitTimeMorningContact ? (
+            <p className="mt-1 text-xs text-[var(--muted)]">連絡時間: 当日朝連絡</p>
+          ) : (c.contactAttemptTimes?.length ?? 0) > 0 ? (
+            <p className="mt-1 text-xs text-[var(--muted)]">連絡時間: {c.contactAttemptTimes!.join(", ")}</p>
+          ) : (c.visitTimeStart || c.visitTimeEnd) ? (
+            <p className="mt-1 text-xs text-[var(--muted)]">連絡時間: {[c.visitTimeStart || "--", c.visitTimeEnd || "--"].join("～")}</p>
+          ) : null}
+        </div>
       </Link>
       <button
         type="button"
@@ -104,20 +145,62 @@ function CaseRow({
   );
 }
 
-export default function CalendarView({ statusFilter, assigneeFilter }: Props) {
+export default function CalendarView({ statusFilter, assigneeFilter, selectedDateFromQuery }: Props) {
   const [current, setCurrent] = useState(() => new Date());
   const [refreshKey, setRefreshKey] = useState(0);
   const [cases, setCases] = useState<CaseRecord[]>([]);
   /** クリックして詳細表示する日付（yyyy-MM-dd） */
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+  /** 地図で現在選択中の案件ID（対応する一覧行を強調表示する） */
+  const [activeMapCaseId, setActiveMapCaseId] = useState<string | null>(null);
+  /** 地図表示は訪問日確定のみ（一覧は履歴として残す） */
+  const mapOnlyStatusFilter: CaseStatus = "visit_confirmed";
 
   useEffect(() => {
-    setCases(getAllCases());
-  }, [refreshKey]);
+    const d = (selectedDateFromQuery ?? "").trim();
+    if (!d) return;
+    setSelectedDateKey(d);
+    try {
+      setCurrent(parseISO(d));
+    } catch {
+      // ignore
+    }
+  }, [selectedDateFromQuery]);
+
+  const reloadCases = useCallback(() => {
+    void getAllCases().then(setCases);
+  }, []);
+
+  useEffect(() => {
+    reloadCases();
+  }, [refreshKey, reloadCases]);
+
+  useEffect(() => {
+    if (!activeMapCaseId) return;
+    const el = document.querySelector<HTMLElement>(
+      `[data-map-case-row="${CSS.escape(activeMapCaseId)}"]`
+    );
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [activeMapCaseId, selectedDateKey, statusFilter, assigneeFilter, cases]);
+
+  // 他画面で更新したあとに戻ってきたとき、最新状態を反映する
+  useEffect(() => {
+    const onFocus = () => reloadCases();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") reloadCases();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [reloadCases]);
 
   const assigneeCases = useMemo(() => {
     if (!assigneeFilter) return cases;
-    return cases.filter((c) => (c.assignedTo ?? "").trim() === assigneeFilter.trim());
+    const filterKey = normalizeAssigneeName(assigneeFilter);
+    return cases.filter((c) => normalizeAssigneeName(c.assignedTo) === filterKey);
   }, [cases, assigneeFilter]);
 
   const statusCounts = useMemo(() => {
@@ -131,9 +214,10 @@ export default function CalendarView({ statusFilter, assigneeFilter }: Props) {
 
   const casesByDate = useMemo(() => {
     const map = new Map<string, typeof cases>();
+    const filterKey = normalizeAssigneeName(assigneeFilter);
     for (const c of cases) {
       if (statusFilter && c.status !== statusFilter) continue;
-      if (assigneeFilter && (c.assignedTo ?? "").trim() !== assigneeFilter.trim()) continue;
+      if (assigneeFilter && normalizeAssigneeName(c.assignedTo) !== filterKey) continue;
       const key = c.visitDate
         ? format(parseISO(c.visitDate), "yyyy-MM-dd")
         : format(parseISO(c.createdAt), "yyyy-MM-dd");
@@ -142,6 +226,20 @@ export default function CalendarView({ statusFilter, assigneeFilter }: Props) {
     }
     return map;
   }, [cases, statusFilter, assigneeFilter]);
+
+  const allCasesByDate = useMemo(() => {
+    const map = new Map<string, typeof cases>();
+    const filterKey = normalizeAssigneeName(assigneeFilter);
+    for (const c of cases) {
+      if (assigneeFilter && normalizeAssigneeName(c.assignedTo) !== filterKey) continue;
+      const key = c.visitDate
+        ? format(parseISO(c.visitDate), "yyyy-MM-dd")
+        : format(parseISO(c.createdAt), "yyyy-MM-dd");
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(c);
+    }
+    return map;
+  }, [cases, assigneeFilter]);
 
   const monthStart = startOfMonth(current);
   const monthEnd = endOfMonth(current);
@@ -251,7 +349,7 @@ export default function CalendarView({ statusFilter, assigneeFilter }: Props) {
       </div>
 
       {selectedDateKey && (() => {
-        const dayCases = casesByDate.get(selectedDateKey) ?? [];
+        const dayCases = allCasesByDate.get(selectedDateKey) ?? [];
         const d = parseISO(selectedDateKey);
         return (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4">
@@ -262,25 +360,79 @@ export default function CalendarView({ statusFilter, assigneeFilter }: Props) {
               <p className="text-sm text-[var(--muted)]">予定はありません</p>
             ) : (
               <>
-                <ul className="space-y-1">
-                  {dayCases.map((c) => (
-                    <CaseRow
-                      key={c.id}
-                      c={c}
-                      onDelete={() => {
-                        deleteCase(c.id);
-                        setRefreshKey((k) => k + 1);
-                      }}
-                    />
-                  ))}
-                </ul>
-                <div className="mt-4 pt-3 border-t border-[var(--border)]">
-                  <Link
-                    href={`/map?date=${selectedDateKey}`}
-                    className="inline-block rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] no-underline hover:opacity-90"
-                  >
-                    地図ルートを確認
-                  </Link>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[980px] border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-[var(--border)]/40">
+                        <th className="border border-[var(--border)] px-2 py-1 text-left">受付番号</th>
+                        <th className="border border-[var(--border)] px-2 py-1 text-left">現在のステータス</th>
+                        <th className="border border-[var(--border)] px-2 py-1 text-left">型式</th>
+                        <th className="border border-[var(--border)] px-2 py-1 text-left">担当者</th>
+                        <th className="border border-[var(--border)] px-2 py-1 text-left">訪問先住所</th>
+                        <th className="border border-[var(--border)] px-2 py-1 text-left">登録日</th>
+                        <th className="border border-[var(--border)] px-2 py-1 text-left">訪問日</th>
+                        <th className="border border-[var(--border)] px-2 py-1 text-left">訪問確定時間</th>
+                        <th className="border border-[var(--border)] px-2 py-1 text-left">更新日</th>
+                        <th className="border border-[var(--border)] px-2 py-1 text-left">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dayCases.map((c) => (
+                        <tr
+                          key={c.id}
+                          data-map-case-row={c.id}
+                          className={`hover:bg-[var(--border)]/20 ${activeMapCaseId === c.id ? "map-active-case-row" : ""}`}
+                        >
+                          <td className="border border-[var(--border)] px-2 py-1">{c.receptionNo || "(番号なし)"}</td>
+                          <td className="border border-[var(--border)] px-2 py-1">{getStatusLabel(c.status)}</td>
+                          <td className="border border-[var(--border)] px-2 py-1">
+                            {(c.modelName && c.reportedModelName && c.modelName !== c.reportedModelName)
+                              ? `${c.modelName} / ${c.reportedModelName}`
+                              : (c.modelName || c.reportedModelName || "未入力")}
+                          </td>
+                          <td className="border border-[var(--border)] px-2 py-1">{c.assignedTo?.trim() || "未割当"}</td>
+                          <td className="border border-[var(--border)] px-2 py-1">{formatAddressShort(c.address) || "未入力"}</td>
+                          <td className="border border-[var(--border)] px-2 py-1">{format(parseISO(c.createdAt), "yyyy/MM/dd", { locale: ja })}</td>
+                          <td className="border border-[var(--border)] px-2 py-1">{c.visitDate ? formatVisitDate(c.visitDate) : "未設定"}</td>
+                          <td className="border border-[var(--border)] px-2 py-1">{formatConfirmedTime(c)}</td>
+                          <td className="border border-[var(--border)] px-2 py-1">{format(parseISO(c.updatedAt || c.createdAt), "yyyy/MM/dd", { locale: ja })}</td>
+                          <td className="border border-[var(--border)] px-2 py-1">
+                            <div className="flex items-center gap-2">
+                                  <Link
+                                    href={`/cases/${c.id}/edit?returnTo=${encodeURIComponent(`/calendar?assignee=${encodeURIComponent(assigneeFilter ?? "")}&status=&selectedDate=${encodeURIComponent(c.visitDate ? format(parseISO(c.visitDate), "yyyy-MM-dd") : format(parseISO(c.createdAt), "yyyy-MM-dd"))}`)}`}
+                                    className="text-[var(--primary)] hover:underline"
+                                  >
+                                詳細
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (confirm("この案件を削除しますか？")) {
+                                    await deleteCase(c.id);
+                                    setRefreshKey((k) => k + 1);
+                                  }
+                                }}
+                                className="text-[var(--muted)] hover:text-red-600"
+                              >
+                                削除
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-4 pt-3 border-t border-[var(--border)] space-y-3">
+                  <p className="text-sm text-[var(--muted)]">
+                    {selectedDateKey} の予定のみを地図表示しています。
+                  </p>
+                  <MapView
+                    dateFilterOverride={selectedDateKey}
+                    assigneeFilter={assigneeFilter ?? null}
+                    statusFilter={mapOnlyStatusFilter}
+                    onActiveCaseChange={setActiveMapCaseId}
+                  />
                 </div>
               </>
             )}
@@ -288,7 +440,7 @@ export default function CalendarView({ statusFilter, assigneeFilter }: Props) {
         );
       })()}
 
-      {assigneeFilter && (
+      {assigneeFilter && !selectedDateKey && (
         <div className="space-y-3">
           <p className="text-sm font-medium text-[var(--foreground)]">
             選択中: {assigneeFilter}
@@ -328,18 +480,69 @@ export default function CalendarView({ statusFilter, assigneeFilter }: Props) {
                   <p className="text-sm text-[var(--muted)]">該当する案件はありません</p>
                 ) : (
                   <>
-                    <ul className="space-y-1">
-                      {detailCases.map((c) => (
-                        <CaseRow
-                          key={c.id}
-                          c={c}
-                          onDelete={() => {
-                            deleteCase(c.id);
-                            setRefreshKey((k) => k + 1);
-                          }}
-                        />
-                      ))}
-                    </ul>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[980px] border-collapse text-sm">
+                        <thead>
+                          <tr className="bg-[var(--border)]/40">
+                            <th className="border border-[var(--border)] px-2 py-1 text-left">受付番号</th>
+                            <th className="border border-[var(--border)] px-2 py-1 text-left">現在のステータス</th>
+                            <th className="border border-[var(--border)] px-2 py-1 text-left">型式</th>
+                            <th className="border border-[var(--border)] px-2 py-1 text-left">担当者</th>
+                            <th className="border border-[var(--border)] px-2 py-1 text-left">訪問先住所</th>
+                            <th className="border border-[var(--border)] px-2 py-1 text-left">登録日</th>
+                            <th className="border border-[var(--border)] px-2 py-1 text-left">訪問日</th>
+                            <th className="border border-[var(--border)] px-2 py-1 text-left">訪問確定時間</th>
+                            <th className="border border-[var(--border)] px-2 py-1 text-left">更新日</th>
+                            <th className="border border-[var(--border)] px-2 py-1 text-left">操作</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detailCases.map((c) => (
+                            <tr
+                              key={c.id}
+                              data-map-case-row={c.id}
+                              className={`hover:bg-[var(--border)]/20 ${activeMapCaseId === c.id ? "map-active-case-row" : ""}`}
+                            >
+                              <td className="border border-[var(--border)] px-2 py-1">{c.receptionNo || "(番号なし)"}</td>
+                              <td className="border border-[var(--border)] px-2 py-1">{getStatusLabel(c.status)}</td>
+                              <td className="border border-[var(--border)] px-2 py-1">
+                                {(c.modelName && c.reportedModelName && c.modelName !== c.reportedModelName)
+                                  ? `${c.modelName} / ${c.reportedModelName}`
+                                  : (c.modelName || c.reportedModelName || "未入力")}
+                              </td>
+                              <td className="border border-[var(--border)] px-2 py-1">{c.assignedTo?.trim() || "未割当"}</td>
+                              <td className="border border-[var(--border)] px-2 py-1">{formatAddressShort(c.address) || "未入力"}</td>
+                              <td className="border border-[var(--border)] px-2 py-1">{format(parseISO(c.createdAt), "yyyy/MM/dd", { locale: ja })}</td>
+                              <td className="border border-[var(--border)] px-2 py-1">{c.visitDate ? formatVisitDate(c.visitDate) : "未設定"}</td>
+                              <td className="border border-[var(--border)] px-2 py-1">{formatConfirmedTime(c)}</td>
+                              <td className="border border-[var(--border)] px-2 py-1">{format(parseISO(c.updatedAt || c.createdAt), "yyyy/MM/dd", { locale: ja })}</td>
+                              <td className="border border-[var(--border)] px-2 py-1">
+                                <div className="flex items-center gap-2">
+                                  <Link
+                                    href={`/cases/${c.id}/edit?returnTo=${encodeURIComponent(`/calendar?assignee=${encodeURIComponent(assigneeFilter ?? "")}&status=${encodeURIComponent(statusFilter ?? "")}&selectedDate=${encodeURIComponent(selectedDateKey ?? "")}`)}`}
+                                    className="text-[var(--primary)] hover:underline"
+                                  >
+                                    詳細
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (confirm("この案件を削除しますか？")) {
+                                        await deleteCase(c.id);
+                                        setRefreshKey((k) => k + 1);
+                                      }
+                                    }}
+                                    className="text-[var(--muted)] hover:text-red-600"
+                                  >
+                                    削除
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                     <div className="mt-4 pt-3 border-t border-[var(--border)]">
                       <Link
                         href={`/map?date=${format(parseISO(detailCases[0].visitDate || detailCases[0].createdAt), "yyyy-MM-dd")}`}

@@ -35,6 +35,20 @@ export interface OcrResult {
   inquiryContent: string;
   internalContact: string;
   memo: string;
+  /** 問合内容の生テキスト（分解前） */
+  inquiry_raw?: string;
+  /** 問合先頭行から抽出した型式候補 */
+  model_candidate?: string;
+  /** 問合内「症状」ラベル値 */
+  symptom?: string;
+  /** 問合内「使用年数（購入日）」ラベル値 */
+  usage_years_note?: string;
+  /** 問合内「連絡日時」ラベル値 */
+  contact_datetime_note?: string;
+  /** 問合内「訪問希望日」ラベル値 */
+  preferred_visit_note?: string;
+  /** 問合内「費用説明」ラベル値 */
+  fee_explanation_note?: string;
 }
 
 const EMPTY_OCR: OcrResult = {
@@ -71,6 +85,66 @@ const EMPTY_OCR: OcrResult = {
   memo: "",
 };
 
+/** ゾーンOCRなどでマージ用の空オブジェクトを返す */
+export function getEmptyOcrResult(): OcrResult {
+  return { ...EMPTY_OCR };
+}
+
+/** 電話・FAX欄に本文が丸ごと入るのを防ぐ: 最大文字数 */
+const MAX_PHONE_FAX_LENGTH = 20;
+/** 本文らしいキーワードが含まれる場合は電話番号として扱わない（先頭の番号のみ抽出する） */
+const BODY_KEYWORDS = /問合|依頼内容|修理内容|支払期日|点検登録|本書類|個人情報|完了報告書|修理委託|訪問希望日|受付日|依頼元住所/;
+
+const PHONE_LIKE_RE = /0\d{1,4}[-\s－−ー]?\d{1,4}[-\s－−ー]?\d{4}/g;
+
+function normalizePhoneString(s: string): string {
+  return s
+    .replace(/\s/g, "")
+    .replace(/[-－−ー]/g, "-")
+    .replace(/^[、，,.\s]+|[、，,.\s]+$/g, "")
+    .slice(0, MAX_PHONE_FAX_LENGTH);
+}
+
+/**
+ * 文字列から最初の電話番号らしい部分のみを取り出す（0X-XXXX-XXXX 等）。
+ * 本文が混入した長大な値から番号だけを抜くため。
+ */
+function extractFirstPhoneLike(s: string): string {
+  const normalized = s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+  const match = normalized.match(PHONE_LIKE_RE);
+  return match ? normalizePhoneString(match[0]) : "";
+}
+
+/**
+ * 複数番号があるとき用。依頼元は「電話 → FAX」の順なので、FAXは最後の番号を採用。
+ */
+function extractLastPhoneLike(s: string): string {
+  const normalized = s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+  const matches = normalized.matchAll(PHONE_LIKE_RE);
+  const arr = [...matches];
+  if (arr.length === 0) return "";
+  const last = arr[arr.length - 1][0];
+  return normalizePhoneString(last);
+}
+
+/** 電話・FAX用: 長すぎる／本文キーワード含む場合は番号のみ採用。FAXは preferLast で最後の番号を取る */
+function sanitizePhoneOrFax(raw: string, preferLast = false): string {
+  const trimmed = raw.replace(/\s+/g, " ").trim();
+  if (trimmed.length > MAX_PHONE_FAX_LENGTH || BODY_KEYWORDS.test(trimmed)) {
+    return preferLast ? extractLastPhoneLike(trimmed) : extractFirstPhoneLike(trimmed);
+  }
+  const single = trimmed
+    .replace(/\s/g, "")
+    .replace(/[-－−ー]/g, "-")
+    .replace(/^[、，,.\s]+|[、，,.\s]+$/g, "")
+    .slice(0, MAX_PHONE_FAX_LENGTH);
+  if (preferLast && trimmed.replace(/\D/g, "").length > 10) {
+    const last = extractLastPhoneLike(trimmed);
+    if (last) return last;
+  }
+  return single;
+}
+
 function valueBetweenLabels(
   full: string,
   label: string | RegExp,
@@ -92,10 +166,59 @@ function valueBetweenLabels(
   return raw.replace(/\s+/g, " ").replace(/^[：:\s]+|[：:\s]+$/g, "").trim();
 }
 
-/** 出張修理依頼書のテキストから各項目を抽出 */
-export function parseOcrText(text: string): OcrResult {
+/** 1行目のみ取り出し、最大長で打ち切り（型式名・ガス種など短い欄の取りこぼし防止） */
+function firstLineMax(s: string, maxLen: number): string {
+  const first = s.split(/\n/)[0]?.trim() ?? s;
+  return first.slice(0, maxLen).trim();
+}
+
+/** data/ocr-reference/field-labels.csv 由来の1行（API から渡す用） */
+export type OcrReferenceRow = { field: string; labels: string[]; next_labels: string[] };
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** 参照 CSV のルールで取得した値で result を上書き（電話・FAX はサニタイズ） */
+function applyReferenceOverrides(
+  result: OcrResult,
+  fullOneLine: string,
+  reference: OcrReferenceRow[]
+): void {
+  const keys = new Set(Object.keys(EMPTY_OCR) as (keyof OcrResult)[]);
+  for (const row of reference) {
+    const key = row.field as keyof OcrResult;
+    if (!keys.has(key) || !row.labels.length) continue;
+    const nextRe = row.next_labels.map((s) => new RegExp(escapeRegex(s)));
+    for (const lab of row.labels) {
+      const labelRe = new RegExp(escapeRegex(lab) + "[：:]?\\s*");
+      const val = valueBetweenLabels(fullOneLine, labelRe, nextRe);
+      if (!val) continue;
+      if (row.next_labels.length === 0 && val.length > 400) continue;
+      if (key === "requestFax") (result as OcrResult)[key] = sanitizePhoneOrFax(val, true);
+      else if (key === "requestPhone" || key === "mobile" || key === "phone") (result as OcrResult)[key] = sanitizePhoneOrFax(val);
+      else (result as OcrResult)[key] = val.trim().slice(0, 500);
+      break;
+    }
+  }
+}
+
+/** OCRで漢字・かなの間にスペースが入った場合に除去（ラベル一致のため）。例: "修理 受付 番号" → "修理受付番号" */
+function normalizeCjkSpaces(s: string): string {
+  const cjk = /[\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\u3000-\u303f]/;
+  let prev = "";
+  let t = s.replace(/\r\n/g, "\n");
+  while (prev !== t) {
+    prev = t;
+    t = t.replace(/([^\s])\s+([^\s])/g, (_, a, b) => (cjk.test(a) && cjk.test(b) ? a + b : a + " " + b));
+  }
+  return t;
+}
+
+/** 出張修理依頼書のテキストから各項目を抽出。reference があれば data/ocr-reference のルールで上書き */
+export function parseOcrText(text: string, reference?: OcrReferenceRow[] | null): OcrResult {
   const result = { ...EMPTY_OCR };
-  const full = text.replace(/\r\n/g, "\n");
+  const full = normalizeCjkSpaces(text.replace(/\r\n/g, "\n"));
   const lines = full.split(/\n/).map((s) => s.trim()).filter(Boolean);
   const fullOneLine = lines.join("\n");
 
@@ -117,9 +240,15 @@ export function parseOcrText(text: string): OcrResult {
   const stripHyphens = (s: string) =>
     s.replace(/\s/g, "").replace(/[-－−ー]/g, "").replace(/^[、，,.\s]+|[、，,.\s]+$/g, "");
   const requestPhoneVal = valueBetweenLabels(fullOneLine, /電話番号[：:]?\s*/, [/FAX/, /依頼元住所/, /受付日/]);
-  if (requestPhoneVal && /\d/.test(requestPhoneVal)) result.requestPhone = stripHyphens(requestPhoneVal);
+  if (requestPhoneVal && /\d/.test(requestPhoneVal)) {
+    const sanitized = sanitizePhoneOrFax(requestPhoneVal);
+    if (sanitized && /\d/.test(sanitized)) result.requestPhone = sanitized;
+  }
   const requestFaxVal = valueBetweenLabels(fullOneLine, /FAX[：:]?\s*/, [/依頼元住所/, /受付日/]);
-  if (requestFaxVal && /\d/.test(requestFaxVal)) result.requestFax = stripHyphens(requestFaxVal);
+  if (requestFaxVal && /\d/.test(requestFaxVal)) {
+    const sanitized = sanitizePhoneOrFax(requestFaxVal, true);
+    if (sanitized && /\d/.test(sanitized)) result.requestFax = sanitized;
+  }
   if (!result.requestPhone && !result.requestFax) {
     const phoneFax = valueBetweenLabels(fullOneLine, /電話番号[：:]?\s*[、,]?\s*FAX[：:]?\s*/, [/依頼元住所/, /受付日/]);
     if (phoneFax) result.requestPhoneFax = phoneFax;
@@ -198,20 +327,29 @@ export function parseOcrText(text: string): OcrResult {
   if (!result.customerFurigana) {
     const customerFurigana =
       valueBetweenLabels(fullOneLine, /ﾌﾘｶﾞﾅ\s*（お客様）\s*/, [/郵便番号/, /住所/]) ||
-      valueBetweenLabels(fullOneLine, /フリガナ\s*（お客様）\s*/, [/郵便番号/, /住所/]) ||
-      valueBetweenLabels(fullOneLine, /ﾌﾘｶﾞﾅ\s*/, [/郵便番号/, /住所/]) ||
-      valueBetweenLabels(fullOneLine, /フリガナ\s*/, [/郵便番号/, /住所/]);
+      valueBetweenLabels(fullOneLine, /フリガナ\s*（お客様）\s*/, [/郵便番号/, /住所/]);
     if (customerFurigana && !isInvalidFurigana(customerFurigana)) {
-      result.customerFurigana = customerFurigana.trim();
+      result.customerFurigana = firstLineMax(customerFurigana.trim(), 60);
     }
   }
   if (!result.customerFurigana) {
-    const furiLineIdx = lines.findIndex((l) => /ﾌﾘｶﾞﾅ|フリガナ/.test(l) && !/依頼/.test(l));
+    const afterCustomer = fullOneLine.indexOf("お客様名") >= 0 ? fullOneLine.slice(fullOneLine.indexOf("お客様名")) : "";
+    if (afterCustomer) {
+      const inCustomerBlock =
+        valueBetweenLabels(afterCustomer, /ﾌﾘｶﾞﾅ\s*（お客様）?\s*/, [/郵便番号/, /住所/, /自宅電話/, /型式名/]) ||
+        valueBetweenLabels(afterCustomer, /フリガナ\s*（お客様）?\s*/, [/郵便番号/, /住所/, /自宅電話/, /型式名/]);
+      if (inCustomerBlock && !isInvalidFurigana(inCustomerBlock) && looksLikeKana(inCustomerBlock)) {
+        result.customerFurigana = firstLineMax(inCustomerBlock.trim(), 60);
+      }
+    }
+  }
+  if (!result.customerFurigana) {
+    const furiLineIdx = lines.findIndex((l) => /ﾌﾘｶﾞﾅ|フリガナ/.test(l) && !/依頼|ご担当者|電話番号|FAX/.test(l));
     if (furiLineIdx !== -1) {
       const stripLabel = (s: string) =>
         s.replace(/ﾌﾘｶﾞﾅ\s*（お客様）\s*|フリガナ\s*（お客様）\s*|ﾌﾘｶﾞﾅ\s*|フリガナ\s*|^[：:\s]+/, "").trim();
       const val = stripLabel(lines[furiLineIdx]) || (lines[furiLineIdx + 1] ?? "").trim();
-      if (val && !isInvalidFurigana(val)) result.customerFurigana = val;
+      if (val && !isInvalidFurigana(val) && looksLikeKana(val)) result.customerFurigana = firstLineMax(val, 60);
     }
   }
 
@@ -535,7 +673,10 @@ export function parseOcrText(text: string): OcrResult {
   }
 
   const mobileVal = valueBetweenLabels(fullOneLine, /携帯番号\s*/, [/店舗/, /型式名/]);
-  if (mobileVal && /\d/.test(mobileVal)) result.mobile = mobileVal.replace(/\s/g, "");
+  if (mobileVal && /\d/.test(mobileVal)) {
+    const sanitized = sanitizePhoneOrFax(mobileVal);
+    if (sanitized) result.mobile = sanitized;
+  }
 
   const storeNoVal = valueBetweenLabels(fullOneLine, /店舗[ＮN]o\.?\s*/, [/店舗区分/, /型式名/]);
   if (storeNoVal) result.storeNo = storeNoVal.trim();
@@ -543,9 +684,9 @@ export function parseOcrText(text: string): OcrResult {
   if (storeTypeVal) result.storeType = storeTypeVal.trim();
 
   const modelNameVal =
-    valueBetweenLabels(fullOneLine, /型式名\s*/, [/型式コード/, /お申し出型式名/]) ||
-    valueBetweenLabels(fullOneLine, /型式\s*名\s*/, [/型式コード/, /お申し出型式名/]);
-  if (modelNameVal && /[A-Za-z0-9\-]/.test(modelNameVal)) result.modelName = modelNameVal.replace(/\s+/g, " ").trim();
+    valueBetweenLabels(fullOneLine, /型式名\s*/, [/型式コード/, /お申し出型式名/, /銘板番号/, /ガス種/, /ｶﾞｽ種/, /問合/]) ||
+    valueBetweenLabels(fullOneLine, /型式\s*名\s*/, [/型式コード/, /お申し出型式名/, /銘板番号/, /問合/]);
+  if (modelNameVal && /[A-Za-z0-9\-]/.test(modelNameVal)) result.modelName = firstLineMax(modelNameVal.replace(/\s+/g, " ").trim(), 40);
   if (!result.modelName) {
     const modelLine = lines.find(
       (l) => /^[A-Za-z0-9]+[-－−][A-Za-z0-9]+/.test(l.trim()) && l.length >= 4 && l.length <= 30 && !/問合|住所|電話|番号/.test(l)
@@ -555,23 +696,27 @@ export function parseOcrText(text: string): OcrResult {
   const modelCodeMatch = full.match(/型式コード\s*(\d+)/);
   if (modelCodeMatch) result.modelCode = modelCodeMatch[1];
 
-  const reportedVal = valueBetweenLabels(fullOneLine, /お申し出型式名\s*/, [/銘板番号/, /ｶﾞｽ種/]);
-  if (reportedVal) result.reportedModelName = reportedVal.trim();
-  const nameplateVal = valueBetweenLabels(fullOneLine, /銘板番号\s*/, [/ｶﾞｽ種/, /問合/]);
-  if (nameplateVal) result.nameplateNo = nameplateVal.trim();
-  const gasVal = valueBetweenLabels(fullOneLine, /ｶﾞｽ種\s*/, [/問合/, /依頼内容/, /■/]);
-  if (gasVal) result.gasType = gasVal.trim();
+  const reportedVal = valueBetweenLabels(fullOneLine, /お申し出型式名\s*/, [
+    /銘板番号/, /ｶﾞｽ種/, /ガス種/, /問合/, /依頼内容/, /■/, /問合\s*[\/／]\s*依頼内容/,
+  ]);
+  if (reportedVal) result.reportedModelName = firstLineMax(reportedVal.trim(), 40);
+  const nameplateVal = valueBetweenLabels(fullOneLine, /銘板番号\s*/, [/ｶﾞｽ種/, /ガス種/, /問合/]);
+  if (nameplateVal) result.nameplateNo = firstLineMax(nameplateVal.trim(), 30);
+  const gasVal = valueBetweenLabels(fullOneLine, /(?:ガス種|ｶﾞｽ種)\s*/, [/問合/, /依頼内容/, /■/, /お申し出型式名/]);
+  if (gasVal) result.gasType = firstLineMax(gasVal.trim(), 20);
 
   const inquiryStart = full.search(/問合\s*[\/／]\s*依頼内容|■/);
   if (inquiryStart !== -1) {
     const rest = full.slice(inquiryStart);
     const inquiryEnd = rest.search(/\n最新修理履歴|修理内容\s*他|\n社内連絡/);
     const block = inquiryEnd !== -1 ? rest.slice(0, inquiryEnd) : rest;
-    result.inquiryContent = block
+    const inquiryLines = block
       .split(/\n/)
       .map((s) => s.trim())
-      .filter(Boolean)
-      .join("\n");
+      .filter(Boolean);
+    const dropLabel = (line: string) => /^問合\s*[\/／]\s*依頼内容\s*$|^■\s*$/.test(line) || /^問合\s*[\/／]\s*依頼内容\s*[：:]?\s*$/.test(line);
+    const contentLines = inquiryLines.filter((l, i) => !(i === 0 && dropLabel(l)));
+    result.inquiryContent = contentLines.join("\n");
   }
 
   // 社内連絡：全文から「担当○様から」「請求先」ブロック＋ラベル直後のブロックを結合（表で別セルでも転記）
@@ -655,11 +800,34 @@ export function parseOcrText(text: string): OcrResult {
     }
   }
 
+  // data/ocr-reference/field-labels.csv のルールで上書き（API から reference を渡した場合）
+  if (reference && reference.length > 0) {
+    applyReferenceOverrides(result, fullOneLine, reference);
+  }
+
   // OCRノイズ: 先頭・末尾の [ ] を除去（例: "LP [" → "LP"）
   const stripBrackets = (s: string) => s.replace(/^\s*[\[\]]+|\s*[\[\]]+\s*$/g, "").trim();
   for (const key of Object.keys(result) as (keyof OcrResult)[]) {
     const v = result[key];
-    if (typeof v === "string" && v.length > 0) result[key] = stripBrackets(v) as OcrResult[keyof OcrResult];
+    if (typeof v === "string" && v.length > 0) result[key] = stripBrackets(v);
+  }
+
+  // 短い欄の取りこぼし防止: 1行目・最大長で打ち切り（他項目の文言が混入している場合の救済）
+  const shortCaps: Partial<Record<keyof OcrResult, number>> = {
+    receptionNo: 20,
+    modelName: 40,
+    modelCode: 20,
+    reportedModelName: 40,
+    nameplateNo: 30,
+    gasType: 20,
+    customerFurigana: 60,
+    requestStoreFurigana: 60,
+  };
+  for (const [key, maxLen] of Object.entries(shortCaps)) {
+    const v = result[key as keyof OcrResult];
+    if (typeof v === "string" && v.length > maxLen) {
+      (result as Record<string, string>)[key] = firstLineMax(v, maxLen);
+    }
   }
 
   return result;

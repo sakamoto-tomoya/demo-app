@@ -109,7 +109,7 @@ export default function BankConfigPage() {
           amount: p.amount ?? "",
         });
       }
-      const matchResult = runAutoMatch();
+      const matchResult = await runAutoMatch();
       const msg = [
         payments.length > 0 ? `${payments.length}件を入金データに登録` : "取得した入金データは0件",
         `照合: ${matchResult.updated}件を入金済に更新（${matchResult.checked}件を照合）`,
