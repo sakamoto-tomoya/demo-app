@@ -243,13 +243,7 @@ export default function Nav() {
             </li>
 
 
-            <li>
-              <a href="/api/auth/access/logout" onClick={() => setMenuOpen(false)}
-                className="flex w-full items-center rounded-lg px-4 py-3 text-base font-normal text-white/70 no-underline transition-all duration-150 hover:bg-white/[0.06] hover:text-white"
-              >
-                アクセス解除
-              </a>
-            </li>
+
             <li>
               <Link href="/api/auth/signout" onClick={() => setMenuOpen(false)}
                 className="flex w-full items-center rounded-lg px-4 py-3 text-base font-normal text-white/70 no-underline transition-all duration-150 hover:bg-white/[0.06] hover:text-white"
