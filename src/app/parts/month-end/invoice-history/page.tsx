@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getAllCases, updateCase } from "@/lib/store";
 import { findMatchingBankPayments } from "@/lib/bank-payments-store";
+import { DateInput } from "@/components/DateInput";
 import { runAutoMatch } from "@/lib/accounting-flow";
 import type { CaseRecord } from "@/lib/types";
 
@@ -239,8 +240,7 @@ export default function InvoiceHistoryPage() {
                         {formatDate(c.createdAt ?? "")}
                       </td>
                       <td className="px-4 py-3 text-[var(--foreground)]">
-                        <input
-                          type="date"
+                        <DateInput
                           value={(c.completionExpectedPaymentDate ?? "").slice(0, 10)}
                           onChange={async (e) => {
                             const v = e.target.value;

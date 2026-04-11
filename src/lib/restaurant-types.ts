@@ -1,5 +1,8 @@
 export type ReservationStatus = "pending" | "confirmed" | "cancelled" | "visited" | "no_show";
 
+export type PaymentMethod = "onsite_cash" | "credit_card";
+export type PaymentStatus = "pending_onsite" | "completed" | "failed" | "refunded" | "cancelled";
+
 export type NotificationStatus = "scheduled" | "sent" | "failed" | "cancelled";
 
 export interface RestaurantMenu {
@@ -32,6 +35,14 @@ export interface RestaurantReservation {
   updatedAt: string;
   cancelledAt?: string;
   visitedAt?: string;
+  // 支払い情報
+  paymentMethod?: PaymentMethod;
+  paymentStatus?: PaymentStatus;
+  totalAmount?: number;
+  stripeSessionId?: string;
+  stripePaymentIntentId?: string;
+  stripeRefundId?: string;
+  cancellationDate?: string;
 }
 
 export interface AvailabilitySlot {

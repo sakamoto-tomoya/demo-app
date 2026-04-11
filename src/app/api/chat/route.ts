@@ -58,31 +58,56 @@ Next.js / TypeScript / Dify / Google Maps API / OCR / NextAuth.js / Vercel
 - 250文字以内を目安にコンパクトに答える`;
 
 export async function POST(req: NextRequest) {
-  const { messages } = await req.json();
+  try {
+    const { messages } = await req.json();
 
-  const stream = await client.messages.stream({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 512,
-    system: SYSTEM_PROMPT,
-    messages,
-  });
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      console.error("[chat] ANTHROPIC_API_KEY is not configured");
+      return new Response(
+        JSON.stringify({ error: "APIキーが設定されていません" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
 
-  const encoder = new TextEncoder();
-  const readable = new ReadableStream({
-    async start(controller) {
-      for await (const chunk of stream) {
-        if (
-          chunk.type === "content_block_delta" &&
-          chunk.delta.type === "text_delta"
-        ) {
-          controller.enqueue(encoder.encode(chunk.delta.text));
+    const stream = await client.messages.stream({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 512,
+      system: SYSTEM_PROMPT,
+      messages,
+    });
+
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of stream) {
+            if (
+              chunk.type === "content_block_delta" &&
+              chunk.delta.type === "text_delta"
+            ) {
+              controller.enqueue(encoder.encode(chunk.delta.text));
+            }
+          }
+        } catch (streamErr) {
+          console.error("[chat] Stream error", streamErr);
+          controller.enqueue(
+            encoder.encode("⚠️ 回答の生成中にエラーが発生しました。しばらくしてから再試行してください。")
+          );
+        } finally {
+          controller.close();
         }
-      }
-      controller.close();
-    },
-  });
+      },
+    });
 
-  return new Response(readable, {
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
-  });
+    return new Response(readable, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  } catch (err) {
+    console.error("[chat] Unexpected error", err);
+    return new Response(
+      JSON.stringify({ error: "Internal server error" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
 }

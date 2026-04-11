@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { getAllOutbound, addOutbound, deleteOutbound, clearAllOutbound, decrementVehiclePartByPartNo, findVehiclePartByPartNo, findPartsMasterByPartNo, getInboundByPartNo, getOutboundByPartNo, getOrderInboundQty, getOrderRemainingRaw, getRemainingQtyByOrderNo, normalizePartNo, type OutboundRecord } from "@/lib/parts-store";
 import { formatYen, parsePrice } from "@/lib/price-utils";
 import { getAssigneeNames } from "@/lib/settings";
+import { DateInput } from "@/components/DateInput";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 
 const inputClass =
@@ -295,8 +296,7 @@ export default function PartsOutboundPage() {
           </label>
           <label>
             <span className="text-sm font-medium text-[var(--foreground)]">出庫日 *</span>
-            <input
-              type="date"
+            <DateInput
               value={form.outboundDate}
               onChange={(e) => setForm((p) => ({ ...p, outboundDate: e.target.value }))}
               className={inputClass}

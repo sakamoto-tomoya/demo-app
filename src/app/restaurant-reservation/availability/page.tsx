@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { fetchAvailability, fetchRestaurantMenus } from "@/lib/restaurant-client";
+import { DateInput } from "@/components/DateInput";
 import type { RestaurantMenu } from "@/lib/restaurant-types";
 
 function todayYmd(): string {
@@ -97,11 +98,10 @@ export default function AvailabilityPage() {
           </label>
           <label className="grid gap-1 text-sm text-[var(--muted)]">
             日付
-            <input
-              type="date"
+            <DateInput
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)]"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)]"
             />
           </label>
         </div>

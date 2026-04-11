@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { getAllInbound, addInbound, deleteInbound, addOrIncrementVehiclePart, findVehiclePartByPartNo, findPartsMasterByPartNo, normalizePartNo, syncPartsMasterFromInbound, type InboundRecord } from "@/lib/parts-store";
 import { formatYen, parsePrice } from "@/lib/price-utils";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
+import { DateInput } from "@/components/DateInput";
 import { getDefaultInboundHandlerName, getDefaultOutboundHandlerName, getAssigneeNames, getEmailByAssigneeName } from "@/lib/settings";
 
 const inputClass =
@@ -361,8 +362,7 @@ export default function PartsInboundPage() {
           </div>
           <label data-inbound-error="inboundDate">
             <span className="text-sm font-medium text-[var(--foreground)]">入庫日 *</span>
-            <input
-              type="date"
+            <DateInput
               value={form.inboundDate}
               onChange={(e) => { setForm((p) => ({ ...p, inboundDate: e.target.value })); setErrors((p) => ({ ...p, inboundDate: "" })); }}
               className={errors.inboundDate ? inputErrorClass : inputClass}
@@ -576,20 +576,18 @@ export default function PartsInboundPage() {
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-1.5 text-sm text-[var(--foreground)]">
               <span className="text-[var(--muted)]">開始日</span>
-              <input
-                type="date"
+              <DateInput
                 value={filterStart}
                 onChange={(e) => setFilterStart(e.target.value)}
-                className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm text-[var(--foreground)]"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm text-[var(--foreground)]"
               />
             </label>
             <label className="flex items-center gap-1.5 text-sm text-[var(--foreground)]">
               <span className="text-[var(--muted)]">終了日</span>
-              <input
-                type="date"
+              <DateInput
                 value={filterEnd}
                 onChange={(e) => setFilterEnd(e.target.value)}
-                className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm text-[var(--foreground)]"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm text-[var(--foreground)]"
               />
             </label>
             <button

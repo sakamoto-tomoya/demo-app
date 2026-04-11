@@ -10,6 +10,7 @@ import {
   type ExpenseItem,
   type ExpenseCategory,
 } from "@/lib/expense-store";
+import { DateInput } from "@/components/DateInput";
 
 const inputClass =
   "mt-1 block w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]";
@@ -116,8 +117,7 @@ export default function ExpensePage() {
               <div className="flex-1 min-w-[200px] space-y-3">
                 <label className="block">
                   <span className="text-xs text-[var(--muted)]">日付</span>
-                  <input
-                    type="date"
+                  <DateInput
                     className={inputClass}
                     value={form.date}
                     onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}

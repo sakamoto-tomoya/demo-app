@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DateInput } from "@/components/DateInput";
 import {
   fetchRestaurantNotifications,
   fetchRestaurantReservations,
@@ -48,11 +49,10 @@ export default function RestaurantAdminPage() {
         <div className="flex flex-wrap items-end gap-3">
           <label className="grid gap-1 text-sm text-[var(--muted)]">
             日付
-            <input
-              type="date"
+            <DateInput
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)]"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)]"
             />
           </label>
           <button

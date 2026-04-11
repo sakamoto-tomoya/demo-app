@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { OcrResult } from "@/lib/ocr";
 import type { OcrFieldMapping } from "@/lib/ocr-types";
 import { OcrResultPanel } from "@/components/OcrResultPanel";
+import { DateInput, DateTextInput } from "@/components/DateInput";
 import { addCase, addRoutePin, updateCase, getAllCases } from "@/lib/store";
 import type { VisitEfficiencySuggestionItem } from "@/lib/visit-efficiency-suggestions";
 import { addOutbound, decrementVehiclePartByPartNo } from "@/lib/parts-store";
@@ -1743,11 +1744,11 @@ export default function CaseForm({ onSuccess, onCancel, initialRecord, showCompl
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <label className="block">
             <span className="text-sm font-medium text-[var(--foreground)]">受付日</span>
-            <input type="text" placeholder="2026/03/11" value={form.receptionDate} onChange={(e) => set("receptionDate", e.target.value)} className={inputClass} />
+            <DateTextInput placeholder="2026/03/11" value={form.receptionDate} onChange={(e) => set("receptionDate", e.target.value)} className={inputClass} />
           </label>
           <label className="block">
             <span className="text-sm font-medium text-[var(--foreground)]">訪問希望日</span>
-            <input type="text" placeholder="03/16" value={form.desiredVisitDate} onChange={(e) => set("desiredVisitDate", e.target.value)} className={inputClass} />
+            <DateTextInput placeholder="03/16" value={form.desiredVisitDate} onChange={(e) => set("desiredVisitDate", e.target.value)} className={inputClass} />
           </label>
           <label className="block">
             <span className="text-sm font-medium text-[var(--foreground)]">訪問希望時間</span>
@@ -2040,7 +2041,7 @@ export default function CaseForm({ onSuccess, onCancel, initialRecord, showCompl
           </label>
           <label className="block">
             <span className="text-sm font-medium text-[var(--foreground)]">{form.status === "sns_sent" ? "送信日" : form.status === "contact_only" || form.status === "waiting_contact" || form.status === "no_contact" ? "連絡日" : form.status === "parts_order" ? "部品手配日" : form.status === "estimate" ? "請求書発行日" : "登録日"}</span>
-            <input type="date" value={form.visitDate} onChange={(e) => set("visitDate", e.target.value)} className={inputClass} />
+            <DateInput value={form.visitDate} onChange={(e) => set("visitDate", e.target.value)} className={inputClass} />
             <CaseChat />
           </label>
           {form.status !== "parts_order" && form.status !== "estimate" && (

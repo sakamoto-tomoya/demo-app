@@ -143,10 +143,10 @@ export default function RestaurantReservationPage() {
                 <p className="text-sm text-[var(--muted)]">所要時間: {menu.duration}</p>
                 <p className="text-sm font-medium text-[var(--foreground)]">価格: {menu.price}</p>
                 <Link
-                  href={`/restaurant-reservation/new?menuId=${encodeURIComponent(menu.id)}`}
+                  href={`/restaurant-reservation/booking?menuId=${encodeURIComponent(menu.id)}`}
                   className="mt-1 inline-flex min-h-[42px] w-full items-center justify-center rounded-lg bg-[var(--primary)] px-3 py-2 text-sm font-medium text-[var(--primary-foreground)] no-underline transition-opacity hover:opacity-90"
                 >
-                  このメニューで予約
+                  このコースで予約
                 </Link>
               </div>
             </article>

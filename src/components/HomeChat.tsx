@@ -37,6 +37,37 @@ export default function HomeChat() {
         body: JSON.stringify({ messages: newMessages }),
       });
 
+      if (!res.ok) {
+        const contentType = res.headers.get("content-type") ?? "";
+        let errorMessage = `エラーが発生しました（HTTP ${res.status}）。しばらくしてから再試行してください。`;
+        if (contentType.includes("application/json")) {
+          const errData = await res.json().catch(() => ({}));
+          if (errData?.error) errorMessage = `エラー: ${errData.error}`;
+        }
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: "assistant",
+            content: `⚠️ ${errorMessage}`,
+          };
+          return updated;
+        });
+        return;
+      }
+
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("text/plain") && !contentType.includes("text/event-stream")) {
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: "assistant",
+            content: "⚠️ 予期しないレスポンスが返されました。しばらくしてから再試行してください。",
+          };
+          return updated;
+        });
+        return;
+      }
+
       if (!res.body) return;
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
