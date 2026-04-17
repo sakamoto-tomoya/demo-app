@@ -10,14 +10,6 @@ const UNIFIED_HREF =
   process.env.NEXT_PUBLIC_UNIFIED_PORTAL_URL?.trim() || "/";
 const UNIFIED_EXTERNAL = /^https?:\/\//i.test(UNIFIED_HREF);
 
-const webAppLinks = [
-  { href: "/", label: "概要" },
-  { href: "/cases/new", label: "受付登録" },
-  { href: "/dashboard", label: "案件管理" },
-  { href: "/calendar", label: "担当者別スケジュール" },
-  { href: "/history", label: "受付履歴検索" },
-];
-
 /** サイドバー上のテキストリンク（非選択） */
 const navLinkInactive =
   "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-lg font-normal text-white/90 no-underline transition-all duration-150 min-h-[52px] hover:bg-white/[0.07] hover:text-white active:opacity-90";
@@ -91,8 +83,6 @@ export default function Nav() {
     prevSubmenuOpen.current = webAppNavOpen;
   }, [webAppNavOpen, pathname, router]);
 
-  const partsLinkActive = pathname === "/parts" || (pathname.startsWith("/parts/") && pathname !== "/parts/month-end");
-
   /** プロジェクトメニューがアクティブか（ホーム・About以外） */
   const isProjectActive =
     pathname !== "/" &&
@@ -129,7 +119,7 @@ export default function Nav() {
           <li>
             <Link href="/about" onClick={() => setMenuOpen(false)} className={linkClass(pathname, "/about")}>
               <IconPerson />
-              About
+              自己紹介
             </Link>
           </li>
 
@@ -144,7 +134,12 @@ export default function Nav() {
             >
               <button
                 type="button"
-                onClick={toggleSubmenu}
+                onClick={() => {
+                  if (!webAppNavOpen && isMainContentGatedPath(pathname)) {
+                    router.push("/");
+                  }
+                  toggleSubmenu();
+                }}
                 className={`flex min-h-[48px] min-w-0 flex-1 items-center gap-3 px-4 py-3 text-lg no-underline transition-all duration-150 ${
                   isProjectActive
                     ? "font-semibold text-white hover:opacity-95"
@@ -154,7 +149,7 @@ export default function Nav() {
                 aria-controls="nav-project-submenu"
               >
                 <IconBriefcase />
-                プロジェクト
+                作品集
                 <span className="ml-auto">
                   <IconChevron open={webAppNavOpen} />
                 </span>
@@ -170,54 +165,16 @@ export default function Nav() {
             id="nav-project-submenu"
             className="mt-2 flex w-full flex-col gap-1 rounded-xl border border-white/10 bg-white/[0.04] p-2"
           >
-            <li className="px-2 pb-1">
-              <p className="text-sm font-medium tracking-wide text-white/70">業務・社内ツール</p>
-            </li>
-            {webAppLinks.map(({ href, label }) => (
-              <li key={`${href}-${label}`}>
-                <Link href={href} onClick={() => setMenuOpen(false)}
-                  className={`flex w-full items-center rounded-lg px-4 py-3 text-base no-underline whitespace-nowrap transition-all duration-150 ${
-                    pathname === href
-                      ? "font-semibold text-white bg-white/10"
-                      : "font-normal text-white/90 hover:bg-white/[0.06] hover:text-white"
-                  }`}
-                >
-                  {label}
-                </Link>
-              </li>
-            ))}
             <li>
-              <Link href="/parts" onClick={() => setMenuOpen(false)}
+              <Link href="/dashboard" onClick={() => { setMenuOpen(false); setSubmenuOpen(false); }}
                 className={`flex w-full items-center rounded-lg px-4 py-3 text-base no-underline whitespace-nowrap transition-all duration-150 ${
-                  partsLinkActive
+                  pathname === "/dashboard"
                     ? "font-semibold text-white bg-white/10"
                     : "font-normal text-white/90 hover:bg-white/[0.06] hover:text-white"
                 }`}
               >
-                部品管理
+                業務管理アプリ
               </Link>
-            </li>
-            <li>
-              <Link href="/parts/month-end" onClick={() => setMenuOpen(false)}
-                className={linkClass(pathname, "/parts/month-end").replace("flex w-full items-center gap-3 rounded-xl px-4 py-3 text-lg", "flex w-full items-center rounded-lg px-4 py-3 text-base").replace("min-h-[48px]", "")}
-              >
-                月末処理
-              </Link>
-            </li>
-            <li>
-              <Link href="/expense" onClick={() => setMenuOpen(false)}
-                className={`flex w-full items-center rounded-lg px-4 py-3 text-base no-underline whitespace-nowrap transition-all duration-150 ${
-                  pathname === "/expense"
-                    ? "font-semibold text-white bg-white/10"
-                    : "font-normal text-white/90 hover:bg-white/[0.06] hover:text-white"
-                }`}
-              >
-                経費精算
-              </Link>
-            </li>
-
-            <li className="mt-1 border-t border-white/10 pt-2">
-              <p className="mb-1 px-3 text-sm font-medium tracking-wide text-white/70">その他</p>
             </li>
             <li>
               <Link href="/ai-chat" onClick={() => { setMenuOpen(false); setSubmenuOpen(false); }}
@@ -242,15 +199,6 @@ export default function Nav() {
               </Link>
             </li>
 
-
-
-            <li>
-              <Link href="/api/auth/signout" onClick={() => setMenuOpen(false)}
-                className="flex w-full items-center rounded-lg px-4 py-3 text-base font-normal text-white/70 no-underline transition-all duration-150 hover:bg-white/[0.06] hover:text-white"
-              >
-                ログアウト
-              </Link>
-            </li>
             {UNIFIED_EXTERNAL && (
               <li className="mt-1 border-t border-white/10 pt-2">
                 <a href={UNIFIED_HREF} target="_blank" rel="noopener noreferrer"

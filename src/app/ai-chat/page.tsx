@@ -252,18 +252,6 @@ export default function AiChatPage() {
           title="占いチャットボット紹介動画"
         />
       </section>
-
-      {/* AIファイル分析デモ */}
-      <section className="flex flex-col gap-4 py-4">
-        <div>
-          <h2 className="text-base font-bold text-[var(--foreground)]">AIファイル分析デモ</h2>
-          <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-            画像またはPDFをアップロードすると、AIが内容を自動で分析します。
-            業務書類・報告書・メモなどの要約・課題抽出・改善提案に対応。
-          </p>
-        </div>
-        <FileAnalyzer />
-      </section>
     </div>
   );
 }
