@@ -37,7 +37,7 @@ export function WorkflowDiagram() {
   }, []);
 
   return (
-    <div className="flex w-full flex-1 flex-col overflow-hidden">
+    <div className="flex w-full flex-1 flex-col">
       {/* タブバー */}
       <div className="flex shrink-0 items-end flex-wrap gap-1 border-b border-[var(--border)] bg-[var(--background)] px-4 pt-3 pb-0">
         {TABS.map((tab) => (
