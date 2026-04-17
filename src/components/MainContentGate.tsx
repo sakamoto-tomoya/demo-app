@@ -30,7 +30,7 @@ export function MainContentGate({ children }: { children: ReactNode }) {
           <button
             type="button"
             onClick={() => {
-              setSubmenuOpen(true);
+              setSubmenuOpen(false);
               router.push("/dashboard");
             }}
             className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-2 text-sm font-medium text-[var(--foreground)] shadow-sm transition hover:bg-[var(--muted)]/10"
