@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useWebAppSubmenu } from "@/components/WebAppSubmenuContext";
 
 const TABS = [
   { id: 0, label: "導入前後比較" },
@@ -25,6 +26,7 @@ export function WorkflowDiagram() {
   const [active, setActive] = useState(0);
   const [demoOpen, setDemoOpen] = useState(false);
   const demoRef = useRef<HTMLDivElement>(null);
+  const { setSubmenuOpen } = useWebAppSubmenu();
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -71,7 +73,7 @@ export function WorkflowDiagram() {
                 <Link
                   key={href}
                   href={href}
-                  onClick={() => setDemoOpen(false)}
+                  onClick={() => { setDemoOpen(false); setSubmenuOpen(true); }}
                   className="block px-4 py-3 text-base text-[var(--foreground)] no-underline transition hover:bg-[var(--muted)]/10"
                 >
                   {label}
